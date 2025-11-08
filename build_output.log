@@ -1,0 +1,300 @@
+warning: use of deprecated struct `state::global::GlobalAuthorityInput`: Use Config struct from state/config.rs instead
+  --> programs/prediction-market/src/state/global.rs:29:12
+   |
+29 | pub struct GlobalAuthorityInput {
+   |            ^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated struct `state::global::Global`: Use Config struct from state/config.rs instead
+  --> programs/prediction-market/src/state/global.rs:36:12
+   |
+36 | pub struct Global {
+   |            ^^^^^^
+
+warning: use of deprecated struct `state::global::Global`: Use Config struct from state/config.rs instead
+  --> programs/prediction-market/src/state/global.rs:53:18
+   |
+53 | impl Default for Global {
+   |                  ^^^^^^
+
+warning: use of deprecated struct `state::global::GlobalSettingsInput`: Use Config struct from state/config.rs instead
+  --> programs/prediction-market/src/state/global.rs:73:12
+   |
+73 | pub struct GlobalSettingsInput {
+   |            ^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated struct `state::global::Global`: Use Config struct from state/config.rs instead
+  --> programs/prediction-market/src/state/global.rs:80:6
+   |
+80 | impl Global {
+   |      ^^^^^^
+
+warning: use of deprecated struct `state::global::Global`: Use Config struct from state/config.rs instead
+   --> programs/prediction-market/src/state/global.rs:134:39
+    |
+134 | impl IntoEvent<GlobalUpdateEvent> for Global {
+    |                                       ^^^^^^
+
+warning: use of deprecated struct `state::global::GlobalSettingsInput`: Use Config struct from state/config.rs instead
+  --> programs/prediction-market/src/state/global.rs:89:46
+   |
+89 |     pub fn validate_settings(&self, params: &GlobalSettingsInput) -> Result<()> {
+   |                                              ^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated struct `state::global::GlobalSettingsInput`: Use Config struct from state/config.rs instead
+   --> programs/prediction-market/src/state/global.rs:112:47
+    |
+112 |     pub fn update_settings(&mut self, params: GlobalSettingsInput, slot: u64) {
+    |                                               ^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated struct `state::global::GlobalAuthorityInput`: Use Config struct from state/config.rs instead
+   --> programs/prediction-market/src/state/global.rs:122:48
+    |
+122 |     pub fn update_authority(&mut self, params: GlobalAuthorityInput) {
+    |                                                ^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `state::global::Global::initialized`: Use Config struct from state/config.rs instead
+  --> programs/prediction-market/src/state/global.rs:56:13
+   |
+56 |             initialized: true,
+   |             ^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `state::global::Global::global_authority`: Use Config struct from state/config.rs instead
+  --> programs/prediction-market/src/state/global.rs:57:13
+   |
+57 |             global_authority: Pubkey::default(),
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `state::global::Global::team_wallet`: Use Config struct from state/config.rs instead
+  --> programs/prediction-market/src/state/global.rs:58:13
+   |
+58 |             team_wallet: Pubkey::default(),
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `state::global::Global::platform_buy_fee`: Use Config struct from state/config.rs instead
+  --> programs/prediction-market/src/state/global.rs:59:13
+   |
+59 |             platform_buy_fee: 1.0,
+   |             ^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `state::global::Global::platform_sell_fee`: Use Config struct from state/config.rs instead
+  --> programs/prediction-market/src/state/global.rs:60:13
+   |
+60 |             platform_sell_fee: 1.0,
+   |             ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `state::global::Global::initial_real_token_reserves`: Use Config struct from state/config.rs instead
+  --> programs/prediction-market/src/state/global.rs:63:13
+   |
+63 |             initial_real_token_reserves: 1000000000000000,
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `state::global::Global::token_total_supply`: Use Config struct from state/config.rs instead
+  --> programs/prediction-market/src/state/global.rs:64:13
+   |
+64 |             token_total_supply: 1000000000000000,
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `state::global::Global::mint_decimals`: Use Config struct from state/config.rs instead
+  --> programs/prediction-market/src/state/global.rs:65:13
+   |
+65 |             mint_decimals: 6,
+   |             ^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `state::global::Global::last_updated_slot`: Use Config struct from state/config.rs instead
+  --> programs/prediction-market/src/state/global.rs:66:13
+   |
+66 |             last_updated_slot: 0,
+   |             ^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `state::global::GlobalSettingsInput::mint_decimals`: Use Config struct from state/config.rs instead
+  --> programs/prediction-market/src/state/global.rs:90:18
+   |
+90 |         require!(params.mint_decimals <= 9, PredictionMarketError::InvalidParameter);
+   |                  ^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `state::global::GlobalSettingsInput::token_total_supply`: Use Config struct from state/config.rs instead
+  --> programs/prediction-market/src/state/global.rs:92:13
+   |
+92 |             params.token_total_supply <= u64::MAX / 2,
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `state::global::GlobalSettingsInput::team_wallet`: Use Config struct from state/config.rs instead
+  --> programs/prediction-market/src/state/global.rs:96:13
+   |
+96 |             params.team_wallet != Pubkey::default(),
+   |             ^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `state::global::GlobalSettingsInput::initial_real_token_reserves`: Use Config struct from state/config.rs instead
+   --> programs/prediction-market/src/state/global.rs:100:13
+    |
+100 |             params.initial_real_token_reserves > 0,
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `state::global::GlobalSettingsInput::token_total_supply`: Use Config struct from state/config.rs instead
+   --> programs/prediction-market/src/state/global.rs:106:13
+    |
+106 |             params.token_total_supply > params.initial_real_token_reserves,
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `state::global::GlobalSettingsInput::initial_real_token_reserves`: Use Config struct from state/config.rs instead
+   --> programs/prediction-market/src/state/global.rs:106:41
+    |
+106 |             params.token_total_supply > params.initial_real_token_reserves,
+    |                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `state::global::Global::mint_decimals`: Use Config struct from state/config.rs instead
+   --> programs/prediction-market/src/state/global.rs:113:9
+    |
+113 |         self.mint_decimals = params.mint_decimals;
+    |         ^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `state::global::GlobalSettingsInput::mint_decimals`: Use Config struct from state/config.rs instead
+   --> programs/prediction-market/src/state/global.rs:113:30
+    |
+113 |         self.mint_decimals = params.mint_decimals;
+    |                              ^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `state::global::Global::initial_real_token_reserves`: Use Config struct from state/config.rs instead
+   --> programs/prediction-market/src/state/global.rs:114:9
+    |
+114 |         self.initial_real_token_reserves = params.initial_real_token_reserves;
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `state::global::GlobalSettingsInput::initial_real_token_reserves`: Use Config struct from state/config.rs instead
+   --> programs/prediction-market/src/state/global.rs:114:44
+    |
+114 |         self.initial_real_token_reserves = params.initial_real_token_reserves;
+    |                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `state::global::Global::token_total_supply`: Use Config struct from state/config.rs instead
+   --> programs/prediction-market/src/state/global.rs:115:9
+    |
+115 |         self.token_total_supply = params.token_total_supply;
+    |         ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `state::global::GlobalSettingsInput::token_total_supply`: Use Config struct from state/config.rs instead
+   --> programs/prediction-market/src/state/global.rs:115:35
+    |
+115 |         self.token_total_supply = params.token_total_supply;
+    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `state::global::Global::team_wallet`: Use Config struct from state/config.rs instead
+   --> programs/prediction-market/src/state/global.rs:116:9
+    |
+116 |         self.team_wallet = params.team_wallet;
+    |         ^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `state::global::GlobalSettingsInput::team_wallet`: Use Config struct from state/config.rs instead
+   --> programs/prediction-market/src/state/global.rs:116:28
+    |
+116 |         self.team_wallet = params.team_wallet;
+    |                            ^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `state::global::Global::last_updated_slot`: Use Config struct from state/config.rs instead
+   --> programs/prediction-market/src/state/global.rs:119:9
+    |
+119 |         self.last_updated_slot = slot;
+    |         ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `state::global::GlobalAuthorityInput::global_authority`: Use Config struct from state/config.rs instead
+   --> programs/prediction-market/src/state/global.rs:123:41
+    |
+123 |         if let Some(global_authority) = params.global_authority {
+    |                                         ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `state::global::Global::global_authority`: Use Config struct from state/config.rs instead
+   --> programs/prediction-market/src/state/global.rs:124:13
+    |
+124 |             self.global_authority = global_authority;
+    |             ^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `state::global::Global::last_updated_slot`: Use Config struct from state/config.rs instead
+   --> programs/prediction-market/src/state/global.rs:130:12
+    |
+130 |         Ok(self.last_updated_slot <= last_restart_slot.last_restart_slot)
+    |            ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `state::global::Global::global_authority`: Use Config struct from state/config.rs instead
+   --> programs/prediction-market/src/state/global.rs:137:31
+    |
+137 |             global_authority: self.global_authority,
+    |                               ^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `state::global::Global::initial_real_token_reserves`: Use Config struct from state/config.rs instead
+   --> programs/prediction-market/src/state/global.rs:138:42
+    |
+138 |             initial_real_token_reserves: self.initial_real_token_reserves,
+    |                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `state::global::Global::token_total_supply`: Use Config struct from state/config.rs instead
+   --> programs/prediction-market/src/state/global.rs:139:33
+    |
+139 |             token_total_supply: self.token_total_supply,
+    |                                 ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `state::global::Global::mint_decimals`: Use Config struct from state/config.rs instead
+   --> programs/prediction-market/src/state/global.rs:140:28
+    |
+140 |             mint_decimals: self.mint_decimals,
+    |                            ^^^^^^^^^^^^^^^^^^
+
+warning: unused variable: `global_vault_bump`
+   --> programs/prediction-market/src/instructions/market/redeem_complete_set.rs:156:44
+    |
+156 |     pub fn handler(&mut self, amount: u64, global_vault_bump: u8, market_bump: u8, market_usdc_vault_bump: u8) -> Result<()> {
+    |                                            ^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_global_vault_bump`
+    |
+    = note: `#[warn(unused_variables)]` on by default
+
+warning: unused variable: `market_bump`
+   --> programs/prediction-market/src/instructions/market/redeem_complete_set.rs:156:67
+    |
+156 |     pub fn handler(&mut self, amount: u64, global_vault_bump: u8, market_bump: u8, market_usdc_vault_bump: u8) -> Result<()> {
+    |                                                                   ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_market_bump`
+
+warning: unused variable: `market_usdc_vault_bump`
+   --> programs/prediction-market/src/instructions/market/seed_pool.rs:178:9
+    |
+178 |         market_usdc_vault_bump: u8,
+    |         ^^^^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_market_usdc_vault_bump`
+
+warning: unused variable: `no_token_key`
+   --> programs/prediction-market/src/instructions/market/swap.rs:219:13
+    |
+219 |         let no_token_key = self.no_token.key();
+    |             ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_no_token_key`
+
+warning: unused variable: `yes_token_key`
+   --> programs/prediction-market/src/instructions/market/swap.rs:220:13
+    |
+220 |         let yes_token_key = self.yes_token.key();
+    |             ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_yes_token_key`
+
+Error: Function _ZN191_$LT$prediction_market..instructions..market..add_liquidity..AddLiquidity$u20$as$u20$anchor_lang..Accounts$LT$prediction_market..instructions..market..add_liquidity..AddLiquidityBumps$GT$$GT$12try_accounts17hc2118a5b5fce37e3E Stack offset of 4872 exceeded max offset of 4096 by 776 bytes, please minimize large stack variables. Estimated function frame size: 5248 bytes. Exceeding the maximum stack offset may cause undefined behavior during execution.
+
+Error: Function _ZN157_$LT$prediction_market..instructions..market..swap..Swap$u20$as$u20$anchor_lang..Accounts$LT$prediction_market..instructions..market..swap..SwapBumps$GT$$GT$12try_accounts17h17f4a988f52c09a4E Stack offset of 4568 exceeded max offset of 4096 by 472 bytes, please minimize large stack variables. Estimated function frame size: 4736 bytes. Exceeding the maximum stack offset may cause undefined behavior during execution.
+
+Error: Function _ZN211_$LT$prediction_market..instructions..market..withdraw_liquidity..WithdrawLiquidity$u20$as$u20$anchor_lang..Accounts$LT$prediction_market..instructions..market..withdraw_liquidity..WithdrawLiquidityBumps$GT$$GT$12try_accounts17h7dc95093cd3120edE Stack offset of 4688 exceeded max offset of 4096 by 592 bytes, please minimize large stack variables. Estimated function frame size: 5120 bytes. Exceeding the maximum stack offset may cause undefined behavior during execution.
+
+warning: `prediction-market` (lib) generated 45 warnings
+    Finished `release` profile [optimized] target(s) in 0.35s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.94s
+     Running unittests src/lib.rs (/Users/aricredemption/Projects/ploymarketX402/contract/target/debug/deps/prediction_market-d87a1b6f1b0be64a)
+     Running tests/bench_lmsr_performance.rs (/Users/aricredemption/Projects/ploymarketX402/contract/target/debug/deps/bench_lmsr_performance-26013d2d04f06b5a)
+     Running tests/bench_lmsr_real.rs (/Users/aricredemption/Projects/ploymarketX402/contract/target/debug/deps/bench_lmsr_real-bd5b32247b47f2d1)
+     Running tests/e2e_program_test.rs (/Users/aricredemption/Projects/ploymarketX402/contract/target/debug/deps/e2e_program_test-049d6bed575c8884)
+     Running tests/fuzz_tests.rs (/Users/aricredemption/Projects/ploymarketX402/contract/target/debug/deps/fuzz_tests-cc8eede311a0f2f7)
+     Running tests/integration_real_scenarios.rs (/Users/aricredemption/Projects/ploymarketX402/contract/target/debug/deps/integration_real_scenarios-9c4005a10af9247b)
+     Running tests/integration_user_scenarios.rs (/Users/aricredemption/Projects/ploymarketX402/contract/target/debug/deps/integration_user_scenarios-d05701edf0758cca)
+     Running tests/lmsr_critical_tests.rs (/Users/aricredemption/Projects/ploymarketX402/contract/target/debug/deps/lmsr_critical_tests-915d2004a7ec9cd6)
+     Running tests/precision_tests.rs (/Users/aricredemption/Projects/ploymarketX402/contract/target/debug/deps/precision_tests-316bd43569286ef5)
+     Running tests/prop_circuit_breaker.rs (/Users/aricredemption/Projects/ploymarketX402/contract/target/debug/deps/prop_circuit_breaker-b8ffa93f7457a6a6)
+     Running tests/prop_lmsr.rs (/Users/aricredemption/Projects/ploymarketX402/contract/target/debug/deps/prop_lmsr-b5c256ee7f3a6d1a)
+     Running tests/prop_vault_invariants.rs (/Users/aricredemption/Projects/ploymarketX402/contract/target/debug/deps/prop_vault_invariants-ed480c8bcc9e7f35)
+     Running tests/security_v1_2_6_tests.rs (/Users/aricredemption/Projects/ploymarketX402/contract/target/debug/deps/security_v1_2_6_tests-1e8d4bf5f69728c4)
+     Running tests/sentinel_resolution_tests.rs (/Users/aricredemption/Projects/ploymarketX402/contract/target/debug/deps/sentinel_resolution_tests-9c0e39841bce6410)
+     Running tests/stress_extreme_conditions.rs (/Users/aricredemption/Projects/ploymarketX402/contract/target/debug/deps/stress_extreme_conditions-867162c5b422b91e)
+     Running tests/stress_fixed.rs (/Users/aricredemption/Projects/ploymarketX402/contract/target/debug/deps/stress_fixed-99731acc9cfdf609)
+     Running tests/test_dynamic_lp_ratio.rs (/Users/aricredemption/Projects/ploymarketX402/contract/target/debug/deps/test_dynamic_lp_ratio-824e3870a06c7539)

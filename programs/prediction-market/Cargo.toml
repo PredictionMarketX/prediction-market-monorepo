@@ -1,0 +1,45 @@
+[package]
+name = "prediction-market"
+version = "1.1.1"
+description = "Solana Prediction Market - USDC Migration + Code Quality Polish"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "prediction_market"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+no-tests = []
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+anchor-debug = []
+custom-heap = []
+custom-panic = []
+
+# ✅ v3.0.6: Gas 优化 feature flags
+# 开发/测试模式：启用详细日志和完整事件
+verbose-logs = []       # 启用详细的 msg!() 日志
+event-debug = []        # 启用完整的调试事件结构
+# 生产模式：默认禁用以节省 CU
+
+[dependencies]
+anchor-lang = { version = "0.32.1", features = ["init-if-needed","event-cpi"] }
+anchor-spl = { version = "0.32.1", features = ["metadata"] }
+
+[dev-dependencies]
+# ✅ v1.2.5: Property-based testing for math library
+proptest = "1.0"
+# Pin exact versions to keep ProgramTest processor! signature compatible with Anchor 0.32
+# Note: Using 2.3.1 (latest available on crates.io) instead of 2.3.13 (local Solana installation)
+solana-program = "2.3"
+solana-program-test = "=2.3.1"
+solana-sdk = "=2.3.1"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+sha2 = "0.10"
+borsh = "1.5"
+spl-token = "8.0.0"
+spl-associated-token-account = "7.0.0"
