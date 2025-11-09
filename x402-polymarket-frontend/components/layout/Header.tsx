@@ -54,6 +54,12 @@ export function Header() {
           >
             Portfolio
           </Link>
+          <Link
+            href="/admin"
+            className="text-sm font-medium text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 transition-colors"
+          >
+            Admin
+          </Link>
         </nav>
 
         {/* Wallet Controls */}

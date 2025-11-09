@@ -48,7 +48,7 @@ use state::config::*;
 use state::market::*;
 
 // 声明程序ID
-declare_id!("GRqkunbVQPKsauyZrtVVaJ726JMu5tcuzy5p8nT3EF8N");
+declare_id!("EBdj3PVQ6EZvtXqbaqa5c9rxg7kKnbZ94iLHYAqTSsPQ");
 
 /// 预测市场程序主模块
 #[program]
