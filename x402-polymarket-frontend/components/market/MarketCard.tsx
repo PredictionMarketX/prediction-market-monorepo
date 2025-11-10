@@ -53,7 +53,7 @@ export function MarketCard({ address, market, yesPrice, noPrice }: MarketCardPro
         <div className="flex items-start justify-between mb-4">
           <div className="flex-1">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-              Market #{address.toBase58().slice(0, 8)}...
+              {market.displayName || `Market #${address.toBase58().slice(0, 8)}...`}
             </h3>
             {getStatusBadge()}
           </div>

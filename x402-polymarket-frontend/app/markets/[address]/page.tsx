@@ -144,7 +144,7 @@ export default function MarketDetailPage() {
               <div className="flex items-start justify-between mb-4">
                 <div>
                   <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                    Market #{address.slice(0, 8)}...
+                    {market.displayName || `Market #${address.slice(0, 8)}...`}
                   </h1>
                   <p className="text-sm text-gray-500 dark:text-gray-400 font-mono">
                     {address}
