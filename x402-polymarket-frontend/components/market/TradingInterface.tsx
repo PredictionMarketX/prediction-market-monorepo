@@ -8,16 +8,17 @@ import type { Market, TokenType, TradeDirection } from '@/app/lib/solana/types';
 interface TradingInterfaceProps {
   market: Market;
   marketAddress: PublicKey;
+  onSuccess?: () => void;
 }
 
 type TradeMode = 'swap' | 'mint' | 'redeem';
 
-export function TradingInterface({ market, marketAddress }: TradingInterfaceProps) {
+export function TradingInterface({ market, marketAddress, onSuccess }: TradingInterfaceProps) {
   const { swap, mintCompleteSet, redeemCompleteSet, loading, isConnected } =
     usePredictionMarket();
 
   const [mode, setMode] = useState<TradeMode>('swap');
-  const [tokenType, setTokenType] = useState<TokenType>(0); // 0 = YES, 1 = NO
+  const [tokenType, setTokenType] = useState<TokenType>(1); // 1 = YES, 0 = NO (matches contract)
   const [direction, setDirection] = useState<TradeDirection>(0); // 0 = Buy, 1 = Sell
   const [amount, setAmount] = useState('');
   const [slippage, setSlippage] = useState('1');
@@ -78,6 +79,10 @@ export function TradingInterface({ market, marketAddress }: TradingInterfaceProp
       if (result.success) {
         setSuccess(`Transaction successful! Signature: ${result.signature.slice(0, 8)}...`);
         setAmount('');
+        // Refresh market data after successful transaction
+        if (onSuccess) {
+          onSuccess();
+        }
       } else {
         setError(result.error || 'Transaction failed');
       }
@@ -177,9 +182,9 @@ export function TradingInterface({ market, marketAddress }: TradingInterfaceProp
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
-                  onClick={() => setTokenType(0)}
+                  onClick={() => setTokenType(1)}
                   className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                    tokenType === 0
+                    tokenType === 1
                       ? 'bg-green-600 text-white'
                       : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
                   }`}
@@ -188,9 +193,9 @@ export function TradingInterface({ market, marketAddress }: TradingInterfaceProp
                 </button>
                 <button
                   type="button"
-                  onClick={() => setTokenType(1)}
+                  onClick={() => setTokenType(0)}
                   className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                    tokenType === 1
+                    tokenType === 0
                       ? 'bg-red-600 text-white'
                       : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
                   }`}
@@ -260,7 +265,7 @@ export function TradingInterface({ market, marketAddress }: TradingInterfaceProp
             : loading
             ? 'Processing...'
             : mode === 'swap'
-            ? `${direction === 0 ? 'Buy' : 'Sell'} ${tokenType === 0 ? 'YES' : 'NO'}`
+            ? `${direction === 0 ? 'Buy' : 'Sell'} ${tokenType === 1 ? 'YES' : 'NO'}`
             : mode === 'mint'
             ? 'Mint Complete Set'
             : 'Redeem Complete Set'}

@@ -9,11 +9,12 @@ import { formatUSDC } from '@/app/lib/solana/program';
 interface LiquidityInterfaceProps {
   market: Market;
   marketAddress: PublicKey;
+  onSuccess?: () => void;
 }
 
 type LPMode = 'add' | 'withdraw';
 
-export function LiquidityInterface({ market, marketAddress }: LiquidityInterfaceProps) {
+export function LiquidityInterface({ market, marketAddress, onSuccess }: LiquidityInterfaceProps) {
   const { addLiquidity, withdrawLiquidity, loading, isConnected } = usePredictionMarket();
 
   const [mode, setMode] = useState<LPMode>('add');
@@ -61,6 +62,10 @@ export function LiquidityInterface({ market, marketAddress }: LiquidityInterface
       if (result.success) {
         setSuccess(`Transaction successful! Signature: ${result.signature.slice(0, 8)}...`);
         setAmount('');
+        // Refresh market data after successful transaction
+        if (onSuccess) {
+          onSuccess();
+        }
       } else {
         setError(result.error || 'Transaction failed');
       }
@@ -140,15 +145,15 @@ export function LiquidityInterface({ market, marketAddress }: LiquidityInterface
             type="number"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            step="10"
-            min={mode === 'add' ? "100" : "0"}
-            placeholder={mode === 'add' ? "Min: 100 USDC" : "0.00"}
+            step="1"
+            min={mode === 'add' ? "10" : "0"}
+            placeholder={mode === 'add' ? "Min: 10 USDC" : "0.00"}
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             required
           />
           {mode === 'add' && (
             <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              Single-sided LP: Provide USDC only (Minimum: 100 USDC)
+              Single-sided LP: Provide USDC only (Minimum: 10 USDC)
             </p>
           )}
         </div>

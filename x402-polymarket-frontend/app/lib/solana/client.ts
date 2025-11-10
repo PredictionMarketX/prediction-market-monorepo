@@ -67,18 +67,78 @@ export class PredictionMarketClient {
   }
 
   /**
-   * Fetch user info for a specific market
+   * Fetch user info for a specific market (includes token balances and LP position)
    */
   async getUserInfo(userAddress: PublicKey, marketAddress: PublicKey): Promise<UserInfo | null> {
     try {
-      const [userInfoPDA] = PDAHelper.getUserInfoPDA(userAddress, marketAddress);
-      const userInfo = await this.program.account.userInfo.fetch(userInfoPDA);
-      return userInfo as UserInfo;
-    } catch (error: any) {
-      // Account not existing is expected for users who haven't interacted with the market
-      if (error?.message?.includes('Account does not exist')) {
+      // Get market data to find YES/NO token mints
+      const market = await this.getMarket(marketAddress);
+      if (!market) {
+        console.error('[getUserInfo] Market not found');
         return null;
       }
+
+      // Fetch user_info PDA (trading stats)
+      const [userInfoPDA] = PDAHelper.getUserInfoPDA(userAddress, marketAddress);
+      let userInfo: any = null;
+      try {
+        userInfo = await this.program.account.userInfo.fetch(userInfoPDA);
+      } catch (e: any) {
+        if (e?.message?.includes('Account does not exist')) {
+          // User hasn't traded yet, create empty user info
+          userInfo = {
+            user: userAddress,
+            market: marketAddress,
+            realizedPnl: new BN(0),
+          };
+        } else {
+          throw e;
+        }
+      }
+
+      // Fetch YES token balance
+      const userYesAta = await getAssociatedTokenAddress(
+        market.yesTokenMint,
+        userAddress
+      );
+      let yesAmount = new BN(0);
+      try {
+        const yesAccount = await this.connection.getTokenAccountBalance(userYesAta);
+        yesAmount = new BN(yesAccount.value.amount);
+      } catch (e) {
+        // Account doesn't exist, balance is 0
+      }
+
+      // Fetch NO token balance
+      const userNoAta = await getAssociatedTokenAddress(
+        market.noTokenMint,
+        userAddress
+      );
+      let noAmount = new BN(0);
+      try {
+        const noAccount = await this.connection.getTokenAccountBalance(userNoAta);
+        noAmount = new BN(noAccount.value.amount);
+      } catch (e) {
+        // Account doesn't exist, balance is 0
+      }
+
+      // Fetch LP shares from LP position
+      const [lpPositionPDA] = PDAHelper.getLPPositionPDA(marketAddress, userAddress);
+      let lpShares = new BN(0);
+      try {
+        const lpPosition = await this.program.account.lpPosition.fetch(lpPositionPDA);
+        lpShares = (lpPosition as any).shares || new BN(0);
+      } catch (e: any) {
+        // No LP position, shares is 0
+      }
+
+      return {
+        ...userInfo,
+        yesAmount,
+        noAmount,
+        lpShares,
+      } as UserInfo;
+    } catch (error: any) {
       console.error('Failed to fetch user info:', error);
       return null;
     }
@@ -493,8 +553,77 @@ export class PredictionMarketClient {
         config.teamWallet
       );
 
+      // Pre-create user token accounts and team wallet ATA to reduce CU usage in swap
+      const { Transaction } = await import('@solana/web3.js');
+      const setupTx = new Transaction();
+      let needsSetup = false;
+
+      // Check if user YES token account exists
+      const userYesAtaInfo = await this.connection.getAccountInfo(userYesAta);
+      if (!userYesAtaInfo) {
+        console.log('[swap] User YES token ATA does not exist, will create it...');
+        const createYesAtaIx = createAssociatedTokenAccountInstruction(
+          this.wallet.publicKey,
+          userYesAta,
+          this.wallet.publicKey,
+          market.yesTokenMint
+        );
+        setupTx.add(createYesAtaIx);
+        needsSetup = true;
+      } else {
+        console.log('[swap] User YES token ATA already exists');
+      }
+
+      // Check if user NO token account exists
+      const userNoAtaInfo = await this.connection.getAccountInfo(userNoAta);
+      if (!userNoAtaInfo) {
+        console.log('[swap] User NO token ATA does not exist, will create it...');
+        const createNoAtaIx = createAssociatedTokenAccountInstruction(
+          this.wallet.publicKey,
+          userNoAta,
+          this.wallet.publicKey,
+          market.noTokenMint
+        );
+        setupTx.add(createNoAtaIx);
+        needsSetup = true;
+      } else {
+        console.log('[swap] User NO token ATA already exists');
+      }
+
+      // Check if team wallet USDC ATA exists
+      const teamUsdcAtaInfo = await this.connection.getAccountInfo(teamUsdcAta);
+      if (!teamUsdcAtaInfo) {
+        console.log('[swap] Team wallet USDC ATA does not exist, will create it...');
+        const createTeamAtaIx = createAssociatedTokenAccountInstruction(
+          this.wallet.publicKey,
+          teamUsdcAta,
+          config.teamWallet,
+          usdcMint
+        );
+        setupTx.add(createTeamAtaIx);
+        needsSetup = true;
+      } else {
+        console.log('[swap] Team wallet USDC ATA already exists');
+      }
+
+      // If we need to create any accounts, send setup transaction first
+      if (needsSetup) {
+        try {
+          console.log('[swap] Sending setup transaction to create token accounts...');
+          const setupSig = await this.wallet.sendTransaction(setupTx, this.connection);
+          console.log('[swap] Setup transaction sent:', setupSig);
+          await this.connection.confirmTransaction(setupSig, 'confirmed');
+          console.log('[swap] Setup transaction confirmed - all accounts created');
+        } catch (setupError: any) {
+          console.error('[swap] Failed to create token accounts:', setupError);
+          throw new Error(`Failed to create token accounts: ${setupError.message}`);
+        }
+      } else {
+        console.log('[swap] All token accounts already exist, proceeding with swap');
+      }
+
       // Manually build swap instruction to avoid Anchor validation issues
-      const { TransactionInstruction, Transaction, sendAndConfirmTransaction } = await import('@solana/web3.js');
+      const { TransactionInstruction, sendAndConfirmTransaction, ComputeBudgetProgram } = await import('@solana/web3.js');
       const { BorshCoder } = await import('@coral-xyz/anchor');
 
       const swapKeys = [
@@ -538,10 +667,49 @@ export class PredictionMarketClient {
         data: swapData,
       });
 
-      const tx = new Transaction().add(swapIx);
+      // Add compute budget instructions to avoid CU limit errors
+      console.log('[swap] Adding compute budget instructions (1.4M CU limit - maximum)...');
+      const computeUnitsIx = ComputeBudgetProgram.setComputeUnitLimit({
+        units: 1_400_000, // Request 1.4M compute units (absolute maximum allowed by Solana)
+      });
 
-      // Send the transaction with skipPreflight false to get simulation errors
-      console.log('[swap] Sending transaction with simulation...');
+      const computePriceIx = ComputeBudgetProgram.setComputeUnitPrice({
+        microLamports: 1, // Small priority fee to ensure execution
+      });
+
+      const tx = new Transaction()
+        .add(computeUnitsIx)
+        .add(computePriceIx)
+        .add(swapIx);
+
+      // Simulate transaction first to get better error messages
+      console.log('[swap] Simulating transaction...');
+      try {
+        const { blockhash } = await this.connection.getLatestBlockhash('confirmed');
+        tx.recentBlockhash = blockhash;
+        tx.feePayer = this.wallet.publicKey;
+
+        const simulation = await this.connection.simulateTransaction(tx);
+
+        if (simulation.value.err) {
+          console.error('[swap] Simulation failed:', simulation.value.err);
+          console.error('[swap] Simulation logs:', simulation.value.logs);
+
+          // Try to extract meaningful error from logs
+          const errorLog = simulation.value.logs?.find(log =>
+            log.includes('Error:') || log.includes('failed') || log.includes('AnchorError')
+          );
+
+          throw new Error(errorLog || JSON.stringify(simulation.value.err));
+        }
+
+        console.log('[swap] Simulation succeeded, sending transaction...');
+      } catch (simError: any) {
+        console.error('[swap] Simulation error:', simError);
+        throw simError;
+      }
+
+      // Send the transaction
       try {
         const signature = await this.wallet.sendTransaction(tx, this.connection, {
           skipPreflight: false,
@@ -680,7 +848,7 @@ export class PredictionMarketClient {
       // Provide user-friendly error messages
       let errorMessage = error.message;
       if (error.message?.includes('ValueTooSmall')) {
-        errorMessage = 'The amount is too small. Minimum liquidity amount is 100 USDC. Please provide at least 100 USDC.';
+        errorMessage = 'The amount is too small. Minimum liquidity amount is 10 USDC. Please provide at least 10 USDC.';
       }
 
       return { signature: '', success: false, error: errorMessage };

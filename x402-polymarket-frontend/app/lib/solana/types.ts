@@ -28,11 +28,11 @@ export enum TradeDirection {
 }
 
 /**
- * Token type
+ * Token type (matches contract enum)
  */
 export enum TokenType {
-  Yes = 0,
-  No = 1,
+  No = 0,   // Contract has NO as 0
+  Yes = 1,  // Contract has YES as 1
 }
 
 /**

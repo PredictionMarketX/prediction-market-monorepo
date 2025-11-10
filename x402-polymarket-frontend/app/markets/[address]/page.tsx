@@ -23,6 +23,7 @@ export default function MarketDetailPage() {
   const [marketAddress, setMarketAddress] = useState<PublicKey | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     if (address) {
@@ -36,6 +37,11 @@ export default function MarketDetailPage() {
       }
     }
   }, [address]);
+
+  const refreshMarketData = () => {
+    console.log('[MarketDetail] Refreshing market data...');
+    setRefreshKey((prev) => prev + 1);
+  };
 
   useEffect(() => {
     const loadMarketData = async () => {
@@ -73,7 +79,7 @@ export default function MarketDetailPage() {
 
     loadMarketData();
     // Removed auto-refresh to prevent page reloads while user is interacting
-  }, [marketAddress, isConnected, fetchMarket, fetchUserInfo]);
+  }, [marketAddress, isConnected, fetchMarket, fetchUserInfo, refreshKey]);
 
   if (error) {
     return (
@@ -304,9 +310,9 @@ export default function MarketDetailPage() {
               {/* Tab Content */}
               <div className="p-6">
                 {activeTab === 'trade' ? (
-                  <TradingInterface market={market} marketAddress={marketAddress} />
+                  <TradingInterface market={market} marketAddress={marketAddress} onSuccess={refreshMarketData} />
                 ) : (
-                  <LiquidityInterface market={market} marketAddress={marketAddress} />
+                  <LiquidityInterface market={market} marketAddress={marketAddress} onSuccess={refreshMarketData} />
                 )}
               </div>
             </div>

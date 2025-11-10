@@ -516,7 +516,7 @@ export default function AdminPage() {
           {/* Submit Button */}
           <button
             type="submit"
-            disabled={loading || configExists === true}
+            disabled={loading}
             className="w-full px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? (
@@ -541,10 +541,10 @@ export default function AdminPage() {
                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                   />
                 </svg>
-                Initializing Program...
+                {configExists ? 'Updating Configuration...' : 'Initializing Program...'}
               </span>
             ) : configExists ? (
-              'Already Initialized'
+              'Update Configuration'
             ) : (
               'Initialize Program'
             )}
