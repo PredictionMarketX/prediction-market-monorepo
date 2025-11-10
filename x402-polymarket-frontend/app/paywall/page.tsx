@@ -32,6 +32,9 @@ const DEFAULT_CONFIG: PaymentConfig = {
   recipient: "0x209693Bc6afc0C5328bA36FaF03C514EF312287C",
 };
 
+// Solana recipient address
+const SOLANA_RECIPIENT = process.env.NEXT_PUBLIC_SOLANA_RECIPIENT || "CmGgLQL36Y9ubtTsy2zmE46TAxwCBm66onZmPPhUWNqv";
+
 /**
  * EVM Payment Form Component
  */
@@ -197,15 +200,26 @@ function SolanaPaymentForm({
       setIsProcessing(true);
       setError("");
 
+      // Validate recipient address
+      let recipientPubkey: PublicKey;
+      try {
+        recipientPubkey = new PublicKey(recipient);
+      } catch (err) {
+        throw new Error("Invalid recipient address");
+      }
+
       // Convert amount to lamports
       const amountInSol = parseFloat(amount);
+      if (isNaN(amountInSol) || amountInSol <= 0) {
+        throw new Error("Invalid amount");
+      }
       const lamports = Math.floor(amountInSol * LAMPORTS_PER_SOL);
 
-      // For demo purposes, we'll use a fixed recipient address
-      // In production, you'd want to verify this is a valid Solana address
-      const recipientPubkey = new PublicKey(
-        "11111111111111111111111111111111" // System program - replace with actual recipient
-      );
+      // Check balance
+      const balance = await solanaWallet.connection.getBalance(solanaWallet.publicKey);
+      if (balance < lamports) {
+        throw new Error(`Insufficient balance. You have ${(balance / LAMPORTS_PER_SOL).toFixed(4)} SOL, but need ${amountInSol} SOL`);
+      }
 
       // Create transaction
       const transaction = new Transaction().add(
@@ -217,22 +231,52 @@ function SolanaPaymentForm({
       );
 
       // Get recent blockhash
-      const { blockhash } = await solanaWallet.connection.getLatestBlockhash();
+      const { blockhash, lastValidBlockHeight } = await solanaWallet.connection.getLatestBlockhash('confirmed');
       transaction.recentBlockhash = blockhash;
       transaction.feePayer = solanaWallet.publicKey;
 
-      // Send transaction
+      // Send and confirm transaction
       const signature = await solanaWallet.sendTransaction(transaction);
+      
+      console.log("Solana payment sent:", signature);
+      console.log("Waiting for confirmation...");
 
-      console.log("Solana payment signature:", signature);
-      console.log("Payment good - Amount:", amount, "SOL, Description:", description);
+      // Wait for confirmation
+      const confirmation = await solanaWallet.connection.confirmTransaction({
+        signature,
+        blockhash,
+        lastValidBlockHeight,
+      }, 'confirmed');
+
+      if (confirmation.value.err) {
+        throw new Error("Transaction failed: " + JSON.stringify(confirmation.value.err));
+      }
+
+      console.log("✅ Payment confirmed!");
+      console.log("Amount:", amount, "SOL");
+      console.log("Description:", description);
+      console.log("Signature:", signature);
 
       // In a real app, you'd verify this payment on your backend
-      // For now, we'll just show success
       onSuccess();
     } catch (err) {
       console.error("Solana payment error:", err);
-      setError(err instanceof Error ? err.message : "Payment failed");
+      let errorMessage = "Payment failed";
+      
+      if (err instanceof Error) {
+        errorMessage = err.message;
+        
+        // Provide more helpful error messages
+        if (errorMessage.includes("User rejected")) {
+          errorMessage = "Transaction was rejected by user";
+        } else if (errorMessage.includes("insufficient")) {
+          errorMessage = "Insufficient SOL balance. Please get some devnet SOL from https://faucet.solana.com/";
+        } else if (errorMessage.includes("blockhash")) {
+          errorMessage = "Transaction expired. Please try again.";
+        }
+      }
+      
+      setError(errorMessage);
     } finally {
       setIsProcessing(false);
     }
@@ -391,7 +435,7 @@ export default function Paywall() {
               <SolanaPaymentForm
                 amount={amount}
                 description={description}
-                recipient={DEFAULT_CONFIG.recipient}
+                recipient={SOLANA_RECIPIENT}
                 onSuccess={handlePaymentSuccess}
               />
             )}

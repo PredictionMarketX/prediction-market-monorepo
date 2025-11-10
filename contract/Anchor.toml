@@ -5,15 +5,18 @@ anchor_version = "0.32.1"
 resolution = true
 skip-lint = true
 
+[programs.localnet]
+prediction_market = "G9h26GViC3ma7Zg58HAbLaqEXgYEWLCCiNjfWkooevq2"
+
 [programs.devnet]
-prediction_market = "EgEc7fuse6eQ3UwqeWGFncDtbTwozWCy4piydbeRaNrU"
+prediction_market = "CzddKJkrkAAsECFhEA1KzNpL7RdrZ6PYG7WEkNRrXWgM"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
 cluster = "localnet"
-wallet = "./keys/admin.json"
+wallet = "/Users/alanluo/.config/solana/id.json"
 
 [test.validator]
 url = "https://api.mainnet-beta.solana.com"
@@ -24,3 +27,7 @@ address = "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
 [scripts]
 build = "anchor build"
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
+init-localhost = "node scripts/init-localhost.js"
+init-devnet = "node scripts/init-devnet.js"
+test-market = "node scripts/test-market-flow.js"
+test-simple = "node scripts/test-market-simple.js"

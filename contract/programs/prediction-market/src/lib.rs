@@ -48,7 +48,9 @@ use state::config::*;
 use state::market::*;
 
 // 声明程序ID
-declare_id!("EBdj3PVQ6EZvtXqbaqa5c9rxg7kKnbZ94iLHYAqTSsPQ");
+// Localhost: G9h26GViC3ma7Zg58HAbLaqEXgYEWLCCiNjfWkooevq2
+// Devnet: CzddKJkrkAAsECFhEA1KzNpL7RdrZ6PYG7WEkNRrXWgM
+declare_id!("CzddKJkrkAAsECFhEA1KzNpL7RdrZ6PYG7WEkNRrXWgM");
 
 /// 预测市场程序主模块
 #[program]

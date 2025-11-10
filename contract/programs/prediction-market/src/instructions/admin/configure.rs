@@ -84,6 +84,13 @@ impl<'info> Configure<'info> {
         //    - USDC 抵押 → token_decimals = 6
         //    - 自定义代币 → token_decimals = 自定义精度
         //
+        // 🔍 调试日志
+        msg!("🔍 Debug: token_decimals_config = {}", new_config.token_decimals_config);
+        msg!("🔍 Debug: USDC_DECIMALS = {}", crate::constants::USDC_DECIMALS);
+        msg!("🔍 Debug: authority = {}", new_config.authority);
+        msg!("🔍 Debug: team_wallet = {}", new_config.team_wallet);
+        msg!("🔍 Debug: platform_buy_fee = {}", new_config.platform_buy_fee);
+        
         require!(
             new_config.token_decimals_config == crate::constants::USDC_DECIMALS,
             PredictionMarketError::InvalidParameter
