@@ -47,7 +47,7 @@ export const showToast = {
     },
     options?: ToastOptions
   ) => {
-    return toast.promise(promise, messages, { ...defaultOptions, ...options });
+    return toast.promise(promise, messages as any, { ...defaultOptions, ...options });
   },
 };
 

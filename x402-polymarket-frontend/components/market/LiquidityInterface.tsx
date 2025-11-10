@@ -219,7 +219,7 @@ export function LiquidityInterface({ market, marketAddress, onSuccess }: Liquidi
         <div className="flex justify-between text-xs">
           <span className="text-gray-600 dark:text-gray-400">USDC Reserve:</span>
           <span className="font-medium text-gray-900 dark:text-white">
-            {formatUSDC(market.usdcReserve)}
+            {formatUSDC(market.poolCollateralReserve)}
           </span>
         </div>
         <div className="flex justify-between text-xs">

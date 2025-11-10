@@ -32,6 +32,12 @@ export class PredictionMarketClient {
   private program: Program<PredictionMarket>;
   private connection: Connection;
   public wallet: any;
+  private get account() {
+    return (this.program.account as any);
+  }
+  private get methods() {
+    return (this.program.methods as any);
+  }
 
   constructor(connection: Connection, wallet: any) {
     this.connection = connection;
@@ -45,7 +51,7 @@ export class PredictionMarketClient {
   async getConfig(): Promise<Config | null> {
     try {
       const [configPDA] = PDAHelper.getConfigPDA();
-      const config = await this.program.account.config.fetch(configPDA);
+      const config = await this.account.config.fetch(configPDA);
       return config as Config;
     } catch (error) {
       console.error('Failed to fetch config:', error);
@@ -58,7 +64,7 @@ export class PredictionMarketClient {
    */
   async getMarket(marketAddress: PublicKey): Promise<Market | null> {
     try {
-      const market = await this.program.account.market.fetch(marketAddress);
+      const market = await this.account.market.fetch(marketAddress);
       return market as Market;
     } catch (error) {
       console.error('Failed to fetch market:', error);
@@ -82,7 +88,7 @@ export class PredictionMarketClient {
       const [userInfoPDA] = PDAHelper.getUserInfoPDA(userAddress, marketAddress);
       let userInfo: any = null;
       try {
-        userInfo = await this.program.account.userInfo.fetch(userInfoPDA);
+        userInfo = await this.account.userInfo.fetch(userInfoPDA);
       } catch (e: any) {
         if (e?.message?.includes('Account does not exist')) {
           // User hasn't traded yet, create empty user info
@@ -126,7 +132,7 @@ export class PredictionMarketClient {
       const [lpPositionPDA] = PDAHelper.getLPPositionPDA(marketAddress, userAddress);
       let lpShares = new BN(0);
       try {
-        const lpPosition = await this.program.account.lpPosition.fetch(lpPositionPDA);
+        const lpPosition = await this.account.lpPosition.fetch(lpPositionPDA);
         lpShares = (lpPosition as any).shares || new BN(0);
       } catch (e: any) {
         // No LP position, shares is 0
@@ -149,8 +155,8 @@ export class PredictionMarketClient {
    */
   async getAllMarkets(): Promise<{ address: PublicKey; data: Market }[]> {
     try {
-      const markets = await this.program.account.market.all();
-      return markets.map((m) => ({
+      const markets = await this.account.market.all();
+      return markets.map((m: any) => ({
         address: m.publicKey,
         data: m.account as Market,
       }));
@@ -203,10 +209,10 @@ export class PredictionMarketClient {
       console.log('[createMarket] Program ID:', this.program.programId.toBase58());
 
       // Check if mintNoToken exists
-      const methodBuilder = this.program.methods.mintNoToken({
-        noSymbol: `NO_${params.yesSymbol}`,
-        noUri: params.yesUri,
-      });
+      const methodBuilder = this.methods.mintNoToken(
+        `NO_${params.yesSymbol}`,
+        params.yesUri
+      );
 
       console.log('[createMarket] Method builder created:', methodBuilder);
       console.log('[createMarket] Method builder type:', typeof methodBuilder);
@@ -445,7 +451,7 @@ export class PredictionMarketClient {
       console.log('[setMintAuthority] NO Token Mint:', params.noTokenMint.toBase58());
 
       // Call set_mint_authority instruction
-      const signature = await this.program.methods
+      const signature = await this.methods
         .setMintAuthority()
         .accounts({
           globalConfig: configPDA,
@@ -832,7 +838,7 @@ export class PredictionMarketClient {
       console.log('[addLiquidity] Amount (USDC):', params.usdcAmount);
       console.log('[addLiquidity] Amount (raw):', parseUSDC(params.usdcAmount).toString());
 
-      const signature = await this.program.methods
+      const signature = await this.methods
         .addLiquidity(parseUSDC(params.usdcAmount))
         .accounts({
           globalConfig: configPDA,
@@ -916,7 +922,7 @@ export class PredictionMarketClient {
 
       const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL');
 
-      const signature = await this.program.methods
+      const signature = await this.methods
         .withdrawLiquidity(new BN(params.lpSharesAmount), new BN(0))
         .accounts({
           globalConfig: configPDA,
@@ -1001,7 +1007,7 @@ export class PredictionMarketClient {
       const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL');
 
       // Build mint complete set instruction
-      const mintIx = await this.program.methods
+      const mintIx = await this.methods
         .mintCompleteSet(parseUSDC(params.usdcAmount))
         .accounts({
           globalConfig: configPDA,
@@ -1076,7 +1082,7 @@ export class PredictionMarketClient {
 
       const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL');
 
-      const signature = await this.program.methods
+      const signature = await this.methods
         .redeemCompleteSet(new BN(params.amount))
         .accounts({
           globalConfig: configPDA,

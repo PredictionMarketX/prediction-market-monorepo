@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useWallet } from "@/app/hooks/wallet";
 import { BlockchainType } from "@/app/utils/wallet";
@@ -330,9 +330,9 @@ function SolanaPaymentForm({
 }
 
 /**
- * Main Paywall Component
+ * Paywall Content Component (uses useSearchParams)
  */
-export default function Paywall() {
+function PaywallContent() {
   const { chainType, isConnected, address } = useWallet();
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const searchParams = useSearchParams();
@@ -458,5 +458,22 @@ export default function Paywall() {
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Main Paywall Component with Suspense boundary
+ */
+export default function Paywall() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-purple-50 dark:from-gray-900 dark:to-gray-800">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-12 max-w-md text-center">
+          <div className="text-2xl mb-4">Loading...</div>
+        </div>
+      </div>
+    }>
+      <PaywallContent />
+    </Suspense>
   );
 }

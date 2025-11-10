@@ -54,7 +54,7 @@ export default function AdminPage() {
         console.log('🔍 Checking config PDA:', derivedConfigPDA.toBase58());
 
         // Try to fetch the config account
-        const config = await program.account.config.fetch(derivedConfigPDA);
+        const config = await (program.account as any).config.fetch(derivedConfigPDA);
 
         console.log('✅ Config exists!');
         console.log('  Authority:', config.authority.toBase58());
@@ -134,7 +134,7 @@ export default function AdminPage() {
       });
 
       // Call configure instruction
-      const tx = await program.methods
+      const tx = await (program.methods as any)
         .configure({
           authority: wallet.publicKey,
           pendingAuthority: PublicKey.default,

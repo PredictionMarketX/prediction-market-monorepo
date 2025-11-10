@@ -105,7 +105,7 @@ export function TradingInterface({ market, marketAddress, onSuccess }: TradingIn
       }
 
       if (result.success) {
-        setSuccess(`Transaction successful! Signature: ${result.signature.slice(0, 8)}...`);
+        setSuccess(`Transaction successful! Signature: ${result.signature?.slice(0, 8) || 'N/A'}...`);
         setAmount('');
         // Refresh market data after successful transaction
         if (onSuccess) {

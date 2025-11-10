@@ -206,7 +206,7 @@ export default function MarketDetailPage() {
                   Total Fees
                 </div>
                 <div className="text-xl font-bold text-gray-900 dark:text-white">
-                  ${formatUSDC(market.totalFeesCollected)}
+                  ${formatUSDC(market.accumulatedLpFees)}
                 </div>
               </div>
 
@@ -309,11 +309,11 @@ export default function MarketDetailPage() {
 
               {/* Tab Content */}
               <div className="p-6">
-                {activeTab === 'trade' ? (
+                {marketAddress && activeTab === 'trade' ? (
                   <TradingInterface market={market} marketAddress={marketAddress} onSuccess={refreshMarketData} />
-                ) : (
+                ) : marketAddress ? (
                   <LiquidityInterface market={market} marketAddress={marketAddress} onSuccess={refreshMarketData} />
-                )}
+                ) : null}
               </div>
             </div>
           </div>

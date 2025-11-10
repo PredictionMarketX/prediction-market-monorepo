@@ -39,9 +39,9 @@ export default function InitializePage() {
       const [configPDA] = PDAHelper.getConfigPDA();
 
       try {
-        const config = await program.account.config.fetch(configPDA);
+        const config = await (program.account as any).config.fetch(configPDA);
         setConfigExists(true);
-        setStatus(`✅ Config exists!\nAdmin: ${config.admin.toBase58()}\nTeam Wallet: ${config.teamWallet.toBase58()}\nSwap Fee: ${config.swapFee} bp\nLP Fee: ${config.lpFee} bp`);
+        setStatus(`✅ Config exists!\nAuthority: ${config.authority?.toBase58() || 'N/A'}\nTeam Wallet: ${config.teamWallet?.toBase58() || 'N/A'}`);
       } catch (err) {
         setConfigExists(false);
         setStatus('⚠️ Config not found. You need to initialize it.');
@@ -80,133 +80,53 @@ export default function InitializePage() {
 
       const teamWalletPubkey = new PublicKey(teamWallet);
 
-      // 🔍 调试：检查钱包地址
-      console.log('🔍 钱包信息:');
-      console.log('  wallet.publicKey:', wallet.publicKey?.toBase58());
-      console.log('  teamWallet (state):', teamWallet);
-      console.log('  teamWalletPubkey:', teamWalletPubkey.toBase58());
-      
-      // ✅ 重要：authority 必须是当前连接的钱包
-      // 不要使用 teamWalletPubkey，因为那可能是旧的值
       if (!wallet.publicKey) {
-        throw new Error('钱包未连接');
+        throw new Error('Wallet not connected');
       }
-      
-      // ✅ 按照 IDL 顺序排列字段（Anchor 可能对顺序敏感）
+
       const configParams = {
-        // 1-3: 权限管理 (pubkey)
-        authority: wallet.publicKey,  // ✅ 使用当前连接的钱包
+        authority: wallet.publicKey,
         pending_authority: PublicKey.default,
-        team_wallet: wallet.publicKey,  // ✅ 也使用当前钱包作为 team_wallet
-        
-        // 4-7: 手续费 (u64)
+        team_wallet: wallet.publicKey,
         platform_buy_fee: new BN(swapFee),
         platform_sell_fee: new BN(swapFee),
         lp_buy_fee: new BN(lpFee),
         lp_sell_fee: new BN(lpFee),
-        
-        // 8-10: 代币配置
-        token_supply_config: new BN(1_000_000_000_000), // u64: 1M USDC
-        token_decimals_config: 6, // u8: 必须是 6
-        initial_real_token_reserves_config: new BN(500_000_000), // u64: 500 USDC
-        
-        // 11-12: 流动性配置 (u64)
-        min_sol_liquidity: new BN(5_000_000_000), // 5 SOL
-        min_trading_liquidity: new BN(100_000_000), // 100 USDC
-        
-        // 13-15: 状态标志 (bool)
+        token_supply_config: new BN(1_000_000_000_000),
+        token_decimals_config: 6,
+        initial_real_token_reserves_config: new BN(500_000_000),
+        min_sol_liquidity: new BN(5_000_000_000),
+        min_trading_liquidity: new BN(100_000_000),
         initialized: false,
         is_paused: false,
         whitelist_enabled: whitelistEnabled,
-        
-        // 16-18: USDC 配置
-        usdc_mint: USDC_MINT_DEVNET, // pubkey
-        usdc_vault_min_balance: new BN(1_000_000), // u64: 1 USDC
-        min_usdc_liquidity: new BN(10_000_000), // u64: 10 USDC
-        
-        // 19-23: 保险池配置
-        lp_insurance_pool_balance: new BN(0), // u64
-        lp_insurance_allocation_bps: 2000, // u16: 20%
-        insurance_loss_threshold_bps: 1000, // u16: 10%
-        insurance_max_compensation_bps: 5000, // u16: 50%
-        insurance_pool_enabled: false, // bool
+        usdc_mint: USDC_MINT_DEVNET,
+        usdc_vault_min_balance: new BN(1_000_000),
+        min_usdc_liquidity: new BN(10_000_000),
+        lp_insurance_pool_balance: new BN(0),
+        lp_insurance_allocation_bps: 2000,
+        insurance_loss_threshold_bps: 1000,
+        insurance_max_compensation_bps: 5000,
+        insurance_pool_enabled: false,
       };
 
-      // 🔍 详细调试：打印配置参数
-      console.log('='.repeat(60));
-      console.log('🔍 配置参数详细信息');
-      console.log('='.repeat(60));
-      
-      // 检查 token_decimals_config
-      console.log('\n【关键字段】token_decimals_config:');
-      console.log('  值:', configParams.token_decimals_config);
-      console.log('  类型:', typeof configParams.token_decimals_config);
-      console.log('  === 6?', configParams.token_decimals_config === 6);
-      console.log('  === "6"?', configParams.token_decimals_config === "6");
-      console.log('  === Number(6)?', configParams.token_decimals_config === Number(6));
-      
-      // 检查所有字段
-      console.log('\n【所有字段】:');
-      Object.keys(configParams).forEach((key, index) => {
-        const value = configParams[key];
-        let displayValue = value;
-        let typeInfo = typeof value;
-        
-        if (value instanceof BN) {
-          displayValue = value.toString();
-          typeInfo = 'BN';
-        } else if (value instanceof PublicKey) {
-          displayValue = value.toBase58();
-          typeInfo = 'PublicKey';
-        }
-        
-        console.log(`  ${index + 1}. ${key}: ${displayValue} (${typeInfo})`);
-      });
-      
-      console.log('\n' + '='.repeat(60));
+      console.log('Configuration params:', configParams);
 
       setStatus('Sending transaction...');
 
-      // 重试逻辑
-      let tx: string | undefined;
-      let lastError: any;
-      const maxRetries = 3;
-      
-      for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-          console.log(`📤 尝试发送交易 (${attempt}/${maxRetries})...`);
-          
-          tx = await program.methods
-            .configure(configParams)
-            .accounts({
-              payer: wallet.publicKey,
-              config: configPDA,
-              globalVault: globalVaultPDA,
-              globalVaultUsdcAta,
-              usdcMint: USDC_MINT_DEVNET,
-              systemProgram: SystemProgram.programId,
-              tokenProgram: TOKEN_PROGRAM_ID,
-              associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-            })
-            .rpc();
-          
-          console.log('✅ 交易成功:', tx);
-          break; // 成功，退出循环
-          
-        } catch (err: any) {
-          lastError = err;
-          console.error(`❌ 尝试 ${attempt} 失败:`, err.message);
-          
-          if (attempt < maxRetries) {
-            console.log(`⏳ 等待 2 秒后重试...`);
-            await new Promise(resolve => setTimeout(resolve, 2000));
-          }
-        }
-      }
-      
-      if (!tx) {
-        throw lastError || new Error('交易失败');
-      }
+      const tx = await (program.methods as any)
+        .configure(configParams)
+        .accounts({
+          payer: wallet.publicKey,
+          config: configPDA,
+          globalVault: globalVaultPDA,
+          globalVaultUsdcAta,
+          usdcMint: USDC_MINT_DEVNET,
+          systemProgram: SystemProgram.programId,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+        })
+        .rpc();
 
       setStatus(`✅ Configuration initialized successfully!\n\nTransaction: ${tx}\n\nView on explorer:\nhttps://explorer.solana.com/tx/${tx}?cluster=devnet`);
       setConfigExists(true);

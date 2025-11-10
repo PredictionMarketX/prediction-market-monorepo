@@ -95,7 +95,7 @@ export function MarketCard({ address, market, yesPrice, noPrice }: MarketCardPro
           <div>
             <div className="text-xs text-gray-500 dark:text-gray-400">Total Fees</div>
             <div className="text-sm font-semibold text-gray-900 dark:text-white">
-              ${formatUSDC(market.totalFeesCollected)}
+              ${formatUSDC(market.accumulatedLpFees)}
             </div>
           </div>
         </div>
