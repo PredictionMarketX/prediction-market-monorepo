@@ -1,9 +1,0 @@
-    Finished `release` profile [optimized] target(s) in 0.35s
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.10s
-     Running unittests src/lib.rs (/Users/aricredemption/Projects/ploymarketX402/contract/target/debug/deps/prediction_market-d87a1b6f1b0be64a)
-
-Found a 'test' script in the Anchor.toml. Running it as a test suite!
-
-Running test suite: "/Users/aricredemption/Projects/ploymarketX402/contract/Anchor.toml"
-
-Error: Your configured rpc port: 8899 is already in use
