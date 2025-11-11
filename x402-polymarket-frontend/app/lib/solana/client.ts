@@ -135,6 +135,16 @@ export class PredictionMarketClient {
         const lpPosition = await this.account.lpPosition.fetch(lpPositionPDA);
         // Anchor converts snake_case to camelCase, so lp_shares becomes lpShares
         lpShares = (lpPosition as any).lpShares || new BN(0);
+
+        // WORKAROUND: If lpShares is 0 but investedUsdc > 0, the contract has a bug
+        // Use investedUsdc as a proxy for LP shares (1 USDC = 1 LP share equivalent)
+        if (lpShares.eq(new BN(0))) {
+          const investedUsdc = (lpPosition as any).investedUsdc || new BN(0);
+          if (investedUsdc.gt(new BN(0))) {
+            console.warn('[getUserInfo] LP shares bug detected! Using investedUsdc as proxy. Invested:', investedUsdc.toString());
+            lpShares = investedUsdc; // Treat invested USDC as LP shares for display purposes
+          }
+        }
       } catch (e: any) {
         // No LP position, shares is 0
       }
@@ -926,7 +936,27 @@ export class PredictionMarketClient {
       }
 
       // Validate sufficient LP shares (Anchor converts lp_shares to lpShares)
-      const lpSharesBN = lpPosition.lpShares || new BN(0);
+      let lpSharesBN = lpPosition.lpShares || new BN(0);
+
+      // WORKAROUND: If lpShares is 0 but investedUsdc > 0, explain the issue
+      if (lpSharesBN.eq(new BN(0))) {
+        const investedUsdc = lpPosition.investedUsdc || new BN(0);
+        if (investedUsdc.gt(new BN(0))) {
+          console.warn('[withdrawLiquidity] LP shares is 0 despite invested USDC. Invested:', investedUsdc.toString());
+
+          // The issue: First LP requires minimum 1000 USDC, but less was added
+          // This causes: shares = usdc_amount.saturating_sub(MIN_LIQUIDITY) = 0
+          // Solution: Add at least 1000 USDC for first LP (contract constant: MIN_LIQUIDITY = 1_000_000_000)
+          throw new Error(
+            `Unable to withdraw: You have ${(investedUsdc.toNumber() / 1e6).toFixed(2)} USDC invested, but 0 LP shares. ` +
+            `This happens when adding less than 1000 USDC as the first LP. ` +
+            `The contract requires minimum 1000 USDC for first LP to prevent division by zero. ` +
+            `Your funds are recorded in 'invested_usdc' but you need to wait for the contract to be updated to allow withdrawal, ` +
+            `or add more liquidity (1000+ USDC total) to get LP shares.`
+          );
+        }
+      }
+
       const lpShares = lpSharesBN.toNumber();
       const requestedShares = params.lpSharesAmount;
       if (requestedShares > lpShares) {
@@ -964,8 +994,13 @@ export class PredictionMarketClient {
 
       const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL');
 
-      const signature = await this.methods
-        .withdrawLiquidity(new BN(params.lpSharesAmount), new BN(0))
+      // Convert LP shares amount to base units (with 6 decimals)
+      console.log('[withdrawLiquidity] LP shares amount:', params.lpSharesAmount);
+      console.log('[withdrawLiquidity] LP shares amount (raw):', parseUSDC(params.lpSharesAmount).toString());
+
+      // Build the withdraw instruction
+      const withdrawIx = await this.methods
+        .withdrawLiquidity(parseUSDC(params.lpSharesAmount), new BN(0))
         .accounts({
           globalConfig: configPDA,
           market: marketPDA,
@@ -983,7 +1018,92 @@ export class PredictionMarketClient {
           tokenProgram: TOKEN_PROGRAM_ID,
           associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
         })
-        .rpc();
+        .instruction();
+
+      // Add compute budget instructions (increase to 400k units for withdraw)
+      const { Transaction, ComputeBudgetProgram } = await import('@solana/web3.js');
+      const tx = new Transaction();
+
+      // Add compute budget first (increased to 600k to handle complex withdrawals)
+      tx.add(
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 600_000 }),
+        ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1 })
+      );
+      tx.add(withdrawIx);
+
+      // Set fee payer and get recent blockhash
+      tx.feePayer = this.wallet.publicKey;
+      const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash('finalized');
+      tx.recentBlockhash = blockhash;
+
+      console.log('[withdrawLiquidity] Sending transaction with compute budget:', tx);
+
+      // First, simulate the transaction manually to get detailed logs
+      try {
+        console.log('[withdrawLiquidity] Simulating transaction...');
+        const simulation = await this.connection.simulateTransaction(tx);
+        console.log('[withdrawLiquidity] Simulation result:', simulation);
+
+        if (simulation.value.err) {
+          console.error('[withdrawLiquidity] Simulation failed!');
+          console.error('[withdrawLiquidity] Simulation logs:', simulation.value.logs);
+          throw new Error(`Simulation failed: ${JSON.stringify(simulation.value.err)}`);
+        }
+        console.log('[withdrawLiquidity] Simulation succeeded!');
+      } catch (simError: any) {
+        console.error('[withdrawLiquidity] Simulation error:', simError);
+        throw simError;
+      }
+
+      let signature: string;
+      try {
+        // Send with skipPreflight to get better error details
+        signature = await this.wallet.sendTransaction(tx, this.connection, {
+          skipPreflight: false,
+          preflightCommitment: 'confirmed',
+          maxRetries: 3,
+        });
+        console.log('[withdrawLiquidity] Transaction sent:', signature);
+      } catch (sendError: any) {
+        console.error('[withdrawLiquidity] Send transaction error:', sendError);
+        console.error('[withdrawLiquidity] Error details:', {
+          message: sendError.message,
+          logs: sendError.logs,
+          name: sendError.name,
+          code: sendError.code,
+          error: sendError.error,
+        });
+
+        // Try to get logs from the error object
+        if (sendError.error && typeof sendError.error === 'object' && 'getLogs' in sendError.error) {
+          try {
+            const detailedLogs = sendError.error.getLogs();
+            console.error('[withdrawLiquidity] Detailed simulation logs:', detailedLogs);
+          } catch (e) {
+            console.error('[withdrawLiquidity] Could not get detailed logs');
+          }
+        }
+
+        // If there are simulation logs, show them
+        if (sendError.logs && sendError.logs.length > 0) {
+          console.error('[withdrawLiquidity] Transaction logs:', sendError.logs);
+        }
+
+        // Check if it's the error object itself that has logs
+        if (sendError.error && sendError.error.logs) {
+          console.error('[withdrawLiquidity] Error object logs:', sendError.error.logs);
+        }
+
+        throw sendError;
+      }
+
+      await this.connection.confirmTransaction({
+        signature,
+        blockhash,
+        lastValidBlockHeight,
+      }, 'confirmed');
+
+      console.log('[withdrawLiquidity] Transaction confirmed');
 
       return { signature, success: true };
     } catch (error: any) {

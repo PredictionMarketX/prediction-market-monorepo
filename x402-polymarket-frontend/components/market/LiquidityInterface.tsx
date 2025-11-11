@@ -113,10 +113,10 @@ export function LiquidityInterface({ market, marketAddress, onSuccess }: Liquidi
           </div>
           <div>
             <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-              LP Shares
+              Pool Reserve
             </div>
             <div className="text-lg font-semibold text-gray-900 dark:text-white">
-              {formatUSDC(market.lpShares)}
+              {formatUSDC(market.poolCollateralReserve)}
             </div>
           </div>
         </div>
@@ -146,14 +146,14 @@ export function LiquidityInterface({ market, marketAddress, onSuccess }: Liquidi
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             step="1"
-            min={mode === 'add' ? "10" : "0"}
-            placeholder={mode === 'add' ? "Min: 10 USDC" : "0.00"}
+            min={mode === 'add' ? "1000" : "0"}
+            placeholder={mode === 'add' ? "Min: 1000 USDC (first LP)" : "0.00"}
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             required
           />
           {mode === 'add' && (
             <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              Single-sided LP: Provide USDC only (Minimum: 10 USDC)
+              Single-sided LP: Provide USDC only (Minimum: 1000 USDC for first LP, 10 USDC for subsequent LP)
             </p>
           )}
         </div>
