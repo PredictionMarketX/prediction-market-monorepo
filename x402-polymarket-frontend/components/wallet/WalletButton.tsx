@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useWallet } from '@/app/hooks/wallet';
 import { BlockchainType, WalletUtils } from '@/app/utils/wallet';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
@@ -27,6 +27,23 @@ export function WalletButton({
 }: WalletButtonProps) {
   const { chainType, isConnected, address } = useWallet();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  // Prevent hydration mismatch by only showing wallet state after mounting
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Show placeholder during SSR and initial render to prevent hydration mismatch
+  if (!mounted) {
+    return (
+      <div className={className}>
+        <div className="flex items-center space-x-2 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 opacity-50">
+          <span className="text-sm">Loading...</span>
+        </div>
+      </div>
+    );
+  }
 
   // If connected, show compact button that opens modal
   if (isConnected && address) {

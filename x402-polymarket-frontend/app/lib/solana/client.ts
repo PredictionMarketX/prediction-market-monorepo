@@ -39,9 +39,9 @@ export class PredictionMarketClient {
     return (this.program.methods as any);
   }
 
-  constructor(connection: Connection, wallet: any) {
+  constructor(connection: Connection, wallet?: any) {
     this.connection = connection;
-    this.wallet = wallet;
+    this.wallet = wallet || null;
     this.program = getPredictionMarketProgram(connection, wallet);
   }
 
@@ -162,18 +162,39 @@ export class PredictionMarketClient {
   }
 
   /**
-   * Fetch all markets
+   * Fetch all markets (sorted by creation time, with pagination support)
+   * @param offset Number of markets to skip (default: 0)
+   * @param limit Number of markets to return (default: 10)
    */
-  async getAllMarkets(): Promise<{ address: PublicKey; data: Market }[]> {
+  async getAllMarkets(offset: number = 0, limit: number = 10): Promise<{
+    markets: { address: PublicKey; data: Market }[];
+    hasMore: boolean;
+    total: number;
+  }> {
     try {
-      const markets = await this.account.market.all();
-      return markets.map((m: any) => ({
+      const allMarkets = await this.account.market.all();
+
+      // Map to standard format
+      const formattedMarkets = allMarkets.map((m: any) => ({
         address: m.publicKey,
         data: m.account as Market,
       }));
+
+      // Sort by createdAt timestamp in descending order (newest first)
+      const sortedMarkets = formattedMarkets.sort((a, b) => {
+        const aTime = a.data.createdAt?.toNumber() || 0;
+        const bTime = b.data.createdAt?.toNumber() || 0;
+        return bTime - aTime; // Descending order
+      });
+
+      const total = sortedMarkets.length;
+      const markets = sortedMarkets.slice(offset, offset + limit);
+      const hasMore = offset + limit < total;
+
+      return { markets, hasMore, total };
     } catch (error) {
       console.error('Failed to fetch markets:', error);
-      return [];
+      return { markets: [], hasMore: false, total: 0 };
     }
   }
 
@@ -944,15 +965,16 @@ export class PredictionMarketClient {
         if (investedUsdc.gt(new BN(0))) {
           console.warn('[withdrawLiquidity] LP shares is 0 despite invested USDC. Invested:', investedUsdc.toString());
 
-          // The issue: First LP requires minimum 1000 USDC, but less was added
+          // The issue: First 10 USDC is permanently locked in the pool (MIN_LIQUIDITY)
           // This causes: shares = usdc_amount.saturating_sub(MIN_LIQUIDITY) = 0
-          // Solution: Add at least 1000 USDC for first LP (contract constant: MIN_LIQUIDITY = 1_000_000_000)
+          // If user deposited exactly 10 USDC: shares = 10 - 10 = 0
+          const investedAmount = (investedUsdc.toNumber() / 1e6).toFixed(2);
           throw new Error(
-            `Unable to withdraw: You have ${(investedUsdc.toNumber() / 1e6).toFixed(2)} USDC invested, but 0 LP shares. ` +
-            `This happens when adding less than 1000 USDC as the first LP. ` +
-            `The contract requires minimum 1000 USDC for first LP to prevent division by zero. ` +
-            `Your funds are recorded in 'invested_usdc' but you need to wait for the contract to be updated to allow withdrawal, ` +
-            `or add more liquidity (1000+ USDC total) to get LP shares.`
+            `Unable to withdraw: You invested ${investedAmount} USDC, but have 0 withdrawable LP shares.\n\n` +
+            `The first 10 USDC deposited in any pool is permanently locked (MIN_LIQUIDITY) to prevent division by zero.\n\n` +
+            `Your ${investedAmount} USDC is safe but locked in the pool. To get withdrawable shares, add more liquidity ` +
+            `(e.g., add another ${(10.01 - parseFloat(investedAmount)).toFixed(2)} USDC to have withdrawable shares).\n\n` +
+            `Alternatively, you can still earn fees on your locked liquidity even though you can't withdraw the initial 10 USDC.`
           );
         }
       }

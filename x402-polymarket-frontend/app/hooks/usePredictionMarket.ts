@@ -28,20 +28,22 @@ export function usePredictionMarket() {
   const [markets, setMarkets] = useState<{ address: PublicKey; data: Market }[]>([]);
   const [config, setConfig] = useState<Config | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [total, setTotal] = useState(0);
+  const [currentOffset, setCurrentOffset] = useState(0);
 
-  // Create client instance
+  // Create client instance (works without wallet for read-only operations)
   const client = useMemo(() => {
-    if (!wallet || !wallet.publicKey) return null;
-    return new PredictionMarketClient(connection, wallet);
+    // Always create client - wallet is optional for read-only operations
+    return new PredictionMarketClient(connection, wallet.publicKey ? wallet : undefined);
   }, [connection, wallet]);
 
   /**
-   * Fetch global config
+   * Fetch global config (read-only, works without wallet)
    */
   const fetchConfig = useCallback(async () => {
-    if (!client) return;
-
     try {
       setLoading(true);
       const configData = await client.getConfig();
@@ -58,15 +60,16 @@ export function usePredictionMarket() {
   }, [client]);
 
   /**
-   * Fetch all markets
+   * Fetch initial markets (read-only, works without wallet)
    */
   const fetchMarkets = useCallback(async () => {
-    if (!client) return;
-
     try {
       setLoading(true);
-      const marketsData = await client.getAllMarkets();
-      setMarkets(marketsData);
+      const result = await client.getAllMarkets(0, 10);
+      setMarkets(result.markets);
+      setHasMore(result.hasMore);
+      setTotal(result.total);
+      setCurrentOffset(10);
       setError(null);
     } catch (err: any) {
       setError(err.message || 'Failed to fetch markets');
@@ -74,6 +77,26 @@ export function usePredictionMarket() {
       setLoading(false);
     }
   }, [client]);
+
+  /**
+   * Load more markets (pagination)
+   */
+  const loadMoreMarkets = useCallback(async () => {
+    if (!hasMore || loadingMore) return;
+
+    try {
+      setLoadingMore(true);
+      const result = await client.getAllMarkets(currentOffset, 10);
+      setMarkets(prev => [...prev, ...result.markets]);
+      setHasMore(result.hasMore);
+      setCurrentOffset(prev => prev + 10);
+      setError(null);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load more markets');
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [client, currentOffset, hasMore, loadingMore]);
 
   /**
    * Fetch a specific market
@@ -284,20 +307,21 @@ export function usePredictionMarket() {
     [client]
   );
 
-  // Auto-fetch on mount
+  // Auto-fetch on mount (works without wallet for read-only operations)
   useEffect(() => {
-    if (client) {
-      fetchConfig();
-      fetchMarkets();
-    }
-  }, [client, fetchConfig, fetchMarkets]);
+    fetchConfig();
+    fetchMarkets();
+  }, [fetchConfig, fetchMarkets]);
 
   return {
     // State
     markets,
     config,
     loading,
+    loadingMore,
     error,
+    hasMore,
+    total,
     isConnected: !!wallet.publicKey,
 
     // Read functions
@@ -306,6 +330,7 @@ export function usePredictionMarket() {
     fetchMarket,
     fetchUserInfo,
     calculatePrice,
+    loadMoreMarkets,
 
     // Write functions
     createMarket,

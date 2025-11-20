@@ -1,5 +1,5 @@
-import { AnchorProvider, Program, BN } from '@coral-xyz/anchor';
-import { Connection, PublicKey, Keypair } from '@solana/web3.js';
+import { AnchorProvider, Program, BN, Wallet } from '@coral-xyz/anchor';
+import { Connection, PublicKey, Keypair, Transaction } from '@solana/web3.js';
 import type { PredictionMarket } from './types';
 import IDL from './prediction_market.json';
 import { CONTRACT_CONFIG, PDA_SEEDS, TOKEN_NAMES } from '@/app/configs/contract';
@@ -18,15 +18,40 @@ export const PROGRAM_CONFIG = {
 export { PDA_SEEDS, TOKEN_NAMES };
 
 /**
+ * Read-only wallet for fetching data without wallet connection
+ */
+class ReadOnlyWallet implements Wallet {
+  constructor() {}
+
+  get publicKey(): PublicKey {
+    // Return a dummy public key (won't be used for reads)
+    return PublicKey.default;
+  }
+
+  async signTransaction<T extends Transaction>(tx: T): Promise<T> {
+    throw new Error('Read-only wallet cannot sign transactions');
+  }
+
+  async signAllTransactions<T extends Transaction>(txs: T[]): Promise<T[]> {
+    throw new Error('Read-only wallet cannot sign transactions');
+  }
+}
+
+/**
  * Get Prediction Market Program instance
+ * @param connection Solana connection
+ * @param wallet Wallet for signing transactions (optional for read-only operations)
  */
 export function getPredictionMarketProgram(
   connection: Connection,
-  wallet: any
+  wallet?: any
 ): Program<PredictionMarket> {
+  // Use read-only wallet if no wallet provided
+  const effectiveWallet = wallet || new ReadOnlyWallet();
+
   const provider = new AnchorProvider(
     connection,
-    wallet,
+    effectiveWallet,
     AnchorProvider.defaultOptions()
   );
 

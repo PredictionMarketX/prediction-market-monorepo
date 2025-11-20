@@ -1,12 +1,17 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { WalletButton, ChainSwitcher, WalletStatus } from '@/components/wallet';
 import { useWallet } from '@/app/hooks/wallet';
 
 export function Header() {
   const { isConnected } = useWallet();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:border-gray-800 dark:bg-gray-950/95">
@@ -53,7 +58,7 @@ export function Header() {
         {/* Wallet Controls */}
         <div className="flex items-center space-x-3">
           {/* Chain Switcher - Only show when NOT connected */}
-          {!isConnected && (
+          {mounted && !isConnected && (
             <ChainSwitcher className="hidden sm:inline-flex" />
           )}
 

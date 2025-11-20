@@ -145,16 +145,21 @@ export function LiquidityInterface({ market, marketAddress, onSuccess }: Liquidi
             type="number"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            step="1"
-            min={mode === 'add' ? "1000" : "0"}
-            placeholder={mode === 'add' ? "Min: 1000 USDC (first LP)" : "0.00"}
+            step="0.01"
+            min={mode === 'add' ? "10" : "0"}
+            placeholder={mode === 'add' ? "Min: 10 USDC" : "0.00"}
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             required
           />
           {mode === 'add' && (
-            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              Single-sided LP: Provide USDC only (Minimum: 1000 USDC for first LP, 10 USDC for subsequent LP)
-            </p>
+            <div className="mt-2 space-y-1">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Single-sided LP: Provide USDC only
+              </p>
+              <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                ⚠️ First 10 USDC is permanently locked in the pool. To receive withdrawable LP shares, deposit more than 10 USDC (e.g., 20 USDC = 10 USDC locked + 10 USDC withdrawable).
+              </p>
+            </div>
           )}
         </div>
 
@@ -188,15 +193,16 @@ export function LiquidityInterface({ market, marketAddress, onSuccess }: Liquidi
             <>
               <li>• Single-sided LP: Only provide USDC</li>
               <li>• Contract auto-mints YES + NO tokens</li>
-              <li>• Earn fees from swaps</li>
-              <li>• Receive LP shares proportional to deposit</li>
+              <li>• <strong>First 10 USDC is permanently locked (MIN_LIQUIDITY)</strong></li>
+              <li>• Earn fees from swaps on withdrawable portion</li>
+              <li>• Example: 20 USDC deposit = 10 locked + 10 withdrawable shares</li>
             </>
           ) : (
             <>
               <li>• Burn LP shares to withdraw liquidity</li>
               <li>• Receive USDC, YES, and NO tokens</li>
               <li>• Proportional to your share of pool</li>
-              <li>• May have early withdrawal penalty</li>
+              <li>• First 10 USDC is permanently locked in pool</li>
             </>
           )}
         </ul>
