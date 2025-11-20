@@ -9,7 +9,7 @@ import type { CreateMarketParams } from '@/app/lib/solana/types';
 
 export default function CreateMarketPage() {
   const router = useRouter();
-  const { createMarket, loading, isConnected } = usePredictionMarket();
+  const { createMarket, createMarketWithX402, loading, isConnected } = usePredictionMarket();
   const { chainType, switchChainType, isConnected: anyWalletConnected } = useWallet();
 
   const [formData, setFormData] = useState<CreateMarketParams>({
@@ -23,6 +23,7 @@ export default function CreateMarketPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [showMetadataExample, setShowMetadataExample] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'x402'>('wallet');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,7 +41,10 @@ export default function CreateMarketPage() {
     }
 
     try {
-      const result = await createMarket(formData);
+      // Use the appropriate payment method
+      const result = paymentMethod === 'x402'
+        ? await createMarketWithX402(formData)
+        : await createMarket(formData);
 
       if (result.success) {
         setSuccess(true);
@@ -185,6 +189,80 @@ export default function CreateMarketPage() {
             </div>
           </div>
         )}
+
+        {/* Payment Method Selection */}
+        <div className="mb-6 bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 shadow-lg">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+            Payment Method
+          </label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Wallet Payment Option */}
+            <button
+              type="button"
+              onClick={() => setPaymentMethod('wallet')}
+              className={`p-4 rounded-lg border-2 transition-all ${
+                paymentMethod === 'wallet'
+                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                  : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+              }`}
+            >
+              <div className="flex items-start">
+                <div className="flex-shrink-0">
+                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                    paymentMethod === 'wallet'
+                      ? 'border-blue-500 bg-blue-500'
+                      : 'border-gray-300 dark:border-gray-600'
+                  }`}>
+                    {paymentMethod === 'wallet' && (
+                      <div className="w-2 h-2 bg-white rounded-full" />
+                    )}
+                  </div>
+                </div>
+                <div className="ml-3 text-left">
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
+                    Wallet (Direct)
+                  </h4>
+                  <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                    Pay gas fees directly from your wallet. Requires SOL for transaction fees.
+                  </p>
+                </div>
+              </div>
+            </button>
+
+            {/* x402 Payment Option */}
+            <button
+              type="button"
+              onClick={() => setPaymentMethod('x402')}
+              className={`p-4 rounded-lg border-2 transition-all ${
+                paymentMethod === 'x402'
+                  ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20'
+                  : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+              }`}
+            >
+              <div className="flex items-start">
+                <div className="flex-shrink-0">
+                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                    paymentMethod === 'x402'
+                      ? 'border-purple-500 bg-purple-500'
+                      : 'border-gray-300 dark:border-gray-600'
+                  }`}>
+                    {paymentMethod === 'x402' && (
+                      <div className="w-2 h-2 bg-white rounded-full" />
+                    )}
+                  </div>
+                </div>
+                <div className="ml-3 text-left">
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
+                    x402 (USDC Payment)
+                  </h4>
+                  <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                    Pay 1 USDC creation fee. Backend handles gas fees for you.
+                  </p>
+                </div>
+              </div>
+            </button>
+          </div>
+        </div>
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-800 rounded-xl p-8 border border-gray-200 dark:border-gray-700 shadow-lg">
@@ -342,6 +420,12 @@ export default function CreateMarketPage() {
               <li>Markets use USDC as collateral (6 decimals)</li>
               <li>1 USDC = 1 YES token + 1 NO token</li>
               <li>LMSR pricing algorithm determines token prices</li>
+              {paymentMethod === 'wallet' && (
+                <li>Direct wallet payment requires SOL for gas fees</li>
+              )}
+              {paymentMethod === 'x402' && (
+                <li>x402 payment requires 1 USDC creation fee + USDC balance for signing</li>
+              )}
             </ul>
           </div>
 
@@ -377,6 +461,8 @@ export default function CreateMarketPage() {
               </span>
             ) : success ? (
               'Market Created!'
+            ) : paymentMethod === 'x402' ? (
+              'Create Market with x402 (1 USDC)'
             ) : (
               'Create Market'
             )}

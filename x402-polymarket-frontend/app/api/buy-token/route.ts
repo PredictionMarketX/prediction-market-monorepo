@@ -171,7 +171,13 @@ export async function POST(req: NextRequest): Promise<NextResponse<BuyTokenRespo
         const paymentTx = Transaction.from(paymentTxBuffer);
 
         console.log('[buy-token] Submitting user USDC payment transaction...');
-        const paymentSignature = await connection.sendRawTransaction(paymentTx.serialize());
+        const paymentSignature = await connection.sendRawTransaction(
+          paymentTx.serialize(),
+          {
+            skipPreflight: true, // Skip simulation to avoid blockhash expiration issues
+            maxRetries: 3,
+          }
+        );
         console.log('[buy-token] Payment transaction submitted:', paymentSignature);
 
         // Wait for confirmation
@@ -191,17 +197,18 @@ export async function POST(req: NextRequest): Promise<NextResponse<BuyTokenRespo
     const walletAdapter = {
       publicKey: backendWallet.publicKey,
       signTransaction: async (tx: any) => {
-        tx.sign(backendWallet);
+        // Use partialSign to add signature without replacing existing ones
+        tx.partialSign(backendWallet);
         return tx;
       },
       signAllTransactions: async (txs: any[]) => {
         return txs.map((tx: any) => {
-          tx.sign(backendWallet);
+          tx.partialSign(backendWallet);
           return tx;
         });
       },
       sendTransaction: async (tx: any, conn: Connection) => {
-        tx.sign(backendWallet);
+        tx.partialSign(backendWallet);
         const signature = await conn.sendRawTransaction(tx.serialize());
         return signature;
       },

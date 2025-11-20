@@ -2,8 +2,16 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useConnection, useWallet as useSolanaWalletAdapter } from '@solana/wallet-adapter-react';
-import { PublicKey } from '@solana/web3.js';
+import { PublicKey, Transaction } from '@solana/web3.js';
 import { PredictionMarketClient } from '@/app/lib/solana/client';
+import {
+  getAssociatedTokenAddress,
+  createTransferInstruction,
+  createAssociatedTokenAccountInstruction,
+  getAccount,
+} from '@solana/spl-token';
+import { X402_CONFIG } from '@/app/configs/x402';
+import { SOLANA_CONFIG } from '@/app/configs/solana';
 import type {
   Market,
   Config,
@@ -172,6 +180,201 @@ export function usePredictionMarket() {
   );
 
   /**
+   * Create a new market using x402 payment flow
+   */
+  const createMarketWithX402 = useCallback(
+    async (params: CreateMarketParams): Promise<TransactionResult & { marketAddress?: string }> => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        if (!wallet.publicKey || !wallet.signTransaction) {
+          throw new Error('Wallet not connected');
+        }
+
+        console.log('[x402] Step 1: Requesting payment quote for market creation...');
+
+        // Step 1: Request payment quote (should return 402)
+        const quoteResponse = await fetch('/api/create-market', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            ...params,
+            creator: wallet.publicKey.toBase58(),
+          }),
+        });
+
+        // If not 402, handle as normal response
+        if (quoteResponse.status !== 402) {
+          const result = await quoteResponse.json();
+          setLoading(false);
+          return result;
+        }
+
+        // Parse 402 payment quote
+        const quote = await quoteResponse.json();
+        console.log('[x402] Payment quote received:', quote.payment);
+
+        const recipientTokenAccount = new PublicKey(quote.payment.tokenAccount);
+        const usdcMint = new PublicKey(quote.payment.mint);
+        const amount = quote.payment.amount;
+
+        console.log('[x402] Step 2: Creating USDC payment transaction...');
+        console.log('[x402]   Amount:', quote.payment.amountUSDC, 'USDC (market creation fee)');
+        console.log('[x402]   Recipient:', quote.payment.tokenAccount);
+
+        // Step 2: Get payer's USDC token account
+        const payerTokenAccount = await getAssociatedTokenAddress(
+          usdcMint,
+          wallet.publicKey
+        );
+
+        console.log('[x402]   Payer token account:', payerTokenAccount.toBase58());
+
+        // Check if payer has USDC account and balance
+        try {
+          const payerAccount = await getAccount(connection, payerTokenAccount);
+          const balance = Number(payerAccount.amount) / 1e6; // USDC has 6 decimals
+
+          console.log('[x402]   Payer USDC balance:', balance);
+
+          if (Number(payerAccount.amount) < amount) {
+            throw new Error(
+              `Insufficient USDC balance. Have: ${balance} USDC, Need: ${quote.payment.amountUSDC} USDC`
+            );
+          }
+        } catch (err: any) {
+          if (err.name === 'TokenAccountNotFoundError' ||
+              err.message?.includes('could not find') ||
+              err.message?.includes('Invalid') ||
+              err.message?.includes('account does not exist')) {
+            throw new Error(
+              `You don't have a USDC token account yet. To use x402 payment, you need USDC in your wallet first. ` +
+              `Please get some devnet USDC from a faucet or use the regular "Wallet" payment method instead.`
+            );
+          }
+          throw err;
+        }
+
+        // Step 3: Check if recipient token account exists
+        console.log('[x402] Step 3: Checking recipient token account...');
+        let recipientAccountExists = false;
+        try {
+          await getAccount(connection, recipientTokenAccount);
+          recipientAccountExists = true;
+          console.log('[x402]   ✓ Recipient token account exists');
+        } catch {
+          console.log('[x402]   ⚠ Recipient token account needs to be created');
+        }
+
+        // Step 4: Create payment transaction
+        console.log('[x402] Step 4: Building payment transaction...');
+        const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+
+        const tx = new Transaction({
+          feePayer: wallet.publicKey,
+          blockhash,
+          lastValidBlockHeight,
+        });
+
+        // Add create account instruction if needed
+        if (!recipientAccountExists) {
+          const recipientWallet = new PublicKey(X402_CONFIG.paymentAddress);
+
+          const createAccountIx = createAssociatedTokenAccountInstruction(
+            wallet.publicKey,
+            recipientTokenAccount,
+            recipientWallet,
+            usdcMint
+          );
+
+          tx.add(createAccountIx);
+          console.log('[x402]   + Added create token account instruction');
+        }
+
+        // Add USDC transfer instruction
+        const transferIx = createTransferInstruction(
+          payerTokenAccount,
+          recipientTokenAccount,
+          wallet.publicKey,
+          amount
+        );
+
+        tx.add(transferIx);
+        console.log('[x402]   + Added transfer instruction');
+
+        // Step 5: Sign the transaction
+        console.log('[x402] Step 5: Requesting user signature...');
+        const signedTx = await wallet.signTransaction(tx);
+
+        // Serialize the signed transaction
+        const serializedTx = signedTx.serialize().toString('base64');
+        console.log('[x402]   ✓ Transaction signed');
+
+        // Step 6: Create x402 payment proof
+        console.log('[x402] Step 6: Creating payment proof...');
+        const paymentProof = {
+          x402Version: 1,
+          scheme: 'exact',
+          network: quote.payment.cluster === 'devnet' ? 'solana-devnet' : 'solana-mainnet',
+          payload: {
+            serializedTransaction: serializedTx,
+          },
+        };
+
+        // Base64 encode the payment proof
+        const xPaymentHeader = Buffer.from(JSON.stringify(paymentProof)).toString('base64');
+        console.log('[x402]   ✓ Payment proof created');
+
+        // Step 7: Retry request with X-Payment header
+        console.log('[x402] Step 7: Sending payment proof to server...');
+        const paidResponse = await fetch('/api/create-market', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Payment': xPaymentHeader,
+          },
+          body: JSON.stringify({
+            ...params,
+            creator: wallet.publicKey.toBase58(),
+          }),
+        });
+
+        const result = await paidResponse.json();
+
+        if (result.success) {
+          console.log('[x402] ✅ Market created successfully!');
+          console.log('[x402]   Transaction:', result.signature);
+          console.log('[x402]   Market Address:', result.marketAddress);
+
+          // Refresh markets list
+          await fetchMarkets();
+        } else {
+          console.error('[x402] ❌ Market creation failed:', result.error);
+        }
+
+        setLoading(false);
+        return result;
+
+      } catch (err: any) {
+        console.error('[x402] Error:', err);
+        const errorMessage = err.message || 'An unexpected error occurred';
+        setError(errorMessage);
+        setLoading(false);
+
+        return {
+          success: false,
+          signature: '',
+          error: errorMessage,
+        };
+      }
+    },
+    [connection, wallet, fetchMarkets]
+  );
+
+  /**
    * Swap tokens
    */
   const swap = useCallback(
@@ -334,6 +537,7 @@ export function usePredictionMarket() {
 
     // Write functions
     createMarket,
+    createMarketWithX402,
     swap,
     addLiquidity,
     withdrawLiquidity,

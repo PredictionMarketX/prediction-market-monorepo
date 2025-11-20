@@ -274,7 +274,9 @@ export class PredictionMarketClient {
         const discriminator = Buffer.from([198, 161, 208, 188, 122, 69, 236, 128]);
 
         // Encode args (noSymbol and noUri as strings)
-        const noSymbol = `NO_${params.yesSymbol}`;
+        // Token symbols must be ≤10 characters, so truncate base symbol to max 7 chars (leaves room for "NO_" prefix)
+        const baseSymbol = params.yesSymbol.substring(0, 7);
+        const noSymbol = `NO_${baseSymbol}`;
         const noUri = params.yesUri;
 
         // Manually encode the instruction data
@@ -371,14 +373,17 @@ export class PredictionMarketClient {
       ];
 
       // Encode create_market args with correct field names and types
+      // Token symbols must be ≤10 characters
+      const yesSymbol = params.yesSymbol.substring(0, 10);
+
       const coder = new BorshCoder((this.program as any)._idl);
       const createMarketData = coder.instruction.encode('createMarket', {
         params: {
-          yesSymbol: params.yesSymbol,
+          yesSymbol: yesSymbol,
           yesUri: params.yesUri,
           startSlot: params.startSlot ? new BN(params.startSlot) : null,
           endingSlot: params.endingSlot ? new BN(params.endingSlot) : null,
-          displayName: params.yesSymbol, // Use symbol as display name for now
+          displayName: params.yesSymbol, // Use full symbol as display name
           initialYesProb: 5000, // 50% default probability (in basis points)
         }
       });
