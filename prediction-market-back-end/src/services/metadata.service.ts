@@ -18,6 +18,7 @@ export type ChainId =
 export interface MarketMetadata {
   id: string;
   chainId: ChainId;
+  marketAddress?: string;
   name: string;
   symbol: string;
   description?: string;
@@ -61,7 +62,7 @@ export class MetadataService {
     const sql = getDb();
 
     const [row] = await sql`
-      SELECT id, chain_id, name, symbol, description, category, resolution_source, created_at
+      SELECT id, chain_id, market_address, name, symbol, description, category, resolution_source, created_at
       FROM market_metadata
       WHERE id = ${id}
     `;
@@ -73,10 +74,52 @@ export class MetadataService {
     return this.mapRow(row);
   }
 
+  async getByMarketAddress(marketAddress: string): Promise<MarketMetadata | null> {
+    if (!isDatabaseConfigured()) {
+      return null;
+    }
+
+    const sql = getDb();
+
+    const [row] = await sql`
+      SELECT id, chain_id, market_address, name, symbol, description, category, resolution_source, created_at
+      FROM market_metadata
+      WHERE market_address = ${marketAddress}
+    `;
+
+    if (!row) {
+      return null;
+    }
+
+    return this.mapRow(row);
+  }
+
+  async linkToMarket(metadataId: string, marketAddress: string): Promise<MarketMetadata> {
+    if (!isDatabaseConfigured()) {
+      throw new BadRequestError('Database not configured');
+    }
+
+    const sql = getDb();
+
+    const [row] = await sql`
+      UPDATE market_metadata
+      SET market_address = ${marketAddress}
+      WHERE id = ${metadataId}
+      RETURNING id, chain_id, market_address, name, symbol, description, category, resolution_source, created_at
+    `;
+
+    if (!row) {
+      throw new NotFoundError(`Metadata with id ${metadataId} not found`);
+    }
+
+    return this.mapRow(row);
+  }
+
   private mapRow(row: any): MarketMetadata {
     return {
       id: row.id,
       chainId: row.chain_id,
+      marketAddress: row.market_address || undefined,
       name: row.name,
       symbol: row.symbol,
       description: row.description || undefined,

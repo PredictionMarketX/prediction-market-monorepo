@@ -11,8 +11,9 @@ import type {
   AddLiquidityRequest,
   WithdrawLiquidityRequest,
   LiquidityResponse,
+  Market,
+  MarketMetadata,
 } from '@/types';
-import type { Market } from '@/types';
 
 // Metadata types
 export interface CreateMetadataRequest {
@@ -192,6 +193,22 @@ class APIClient {
     return this.request<CreateMetadataResponse>('/api/metadata', {
       method: 'POST',
       body: JSON.stringify(params),
+    });
+  }
+
+  async getMetadataByMarket(
+    marketAddress: string
+  ): Promise<ApiResponse<MarketMetadata>> {
+    return this.request<MarketMetadata>(`/api/metadata/market/${marketAddress}`);
+  }
+
+  async linkMetadataToMarket(
+    metadataId: string,
+    marketAddress: string
+  ): Promise<ApiResponse<{ id: string; marketAddress: string }>> {
+    return this.request(`/api/metadata/${metadataId}/link`, {
+      method: 'PATCH',
+      body: JSON.stringify({ marketAddress }),
     });
   }
 

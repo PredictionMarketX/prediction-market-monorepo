@@ -14,6 +14,14 @@ interface GetMetadataParams {
   id: string;
 }
 
+interface GetMetadataByMarketParams {
+  address: string;
+}
+
+interface LinkMetadataBody {
+  marketAddress: string;
+}
+
 export async function createMetadataHandler(
   request: FastifyRequest<{ Body: CreateMetadataBody }>,
   reply: FastifyReply
@@ -50,13 +58,63 @@ export async function getMetadataHandler(
 
   const metadata = await metadataService.getById(id);
 
-  // Return as standard token metadata JSON format
+  // Return as market metadata JSON format
+  // Use 'question' field name for frontend compatibility
   return reply.send({
-    name: metadata.name,
+    question: metadata.name, // Frontend expects 'question'
+    name: metadata.name, // Keep 'name' for backwards compatibility
     symbol: metadata.symbol,
     description: metadata.description || '',
     category: metadata.category || '',
     resolutionSource: metadata.resolutionSource || '',
     createdAt: metadata.createdAt.toISOString(),
+  });
+}
+
+export async function getMetadataByMarketHandler(
+  request: FastifyRequest<{ Params: GetMetadataByMarketParams }>,
+  reply: FastifyReply
+) {
+  const { address } = request.params;
+
+  const metadata = await metadataService.getByMarketAddress(address);
+
+  if (!metadata) {
+    return reply.status(404).send({
+      success: false,
+      error: { code: 'NOT_FOUND', message: 'Metadata not found for this market' },
+    });
+  }
+
+  // Return wrapped format for API client consistency
+  return reply.send({
+    success: true,
+    data: {
+      question: metadata.name,
+      name: metadata.name,
+      symbol: metadata.symbol,
+      description: metadata.description || '',
+      category: metadata.category || '',
+      resolutionSource: metadata.resolutionSource || '',
+      createdAt: metadata.createdAt.toISOString(),
+    },
+  });
+}
+
+export async function linkMetadataHandler(
+  request: FastifyRequest<{ Params: GetMetadataParams; Body: LinkMetadataBody }>,
+  reply: FastifyReply
+) {
+  const { id } = request.params;
+  const { marketAddress } = request.body;
+
+  const metadata = await metadataService.linkToMarket(id, marketAddress);
+
+  return reply.send({
+    success: true,
+    data: {
+      id: metadata.id,
+      marketAddress: metadata.marketAddress,
+    },
   });
 }

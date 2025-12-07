@@ -86,17 +86,21 @@ export default function CreateMarketPage() {
 
     try {
       // formValuesToParams is now async (stores metadata in backend)
-      const params = await formValuesToParams(formValues);
+      const { params, metadataId } = await formValuesToParams(formValues);
 
       createMarket(
-        { params },
+        { params, metadataId },
         {
-          onSuccess: () => {
-            router.push('/');
+          onSuccess: (data) => {
+            if (data?.marketAddress) {
+              router.push(`/markets/${data.marketAddress}`);
+            } else {
+              router.push('/');
+            }
           },
         }
       );
-    } catch (error) {
+    } catch {
       setErrors({ submit: 'Failed to prepare market data' });
     }
   };

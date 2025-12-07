@@ -30,6 +30,7 @@ import type {
   AddLiquidityParams,
   WithdrawLiquidityParams,
   UserPosition,
+  UserLPPosition,
 } from '@/types';
 
 // Import IDL
@@ -305,6 +306,163 @@ export class SolanaAdapter implements IBlockchainAdapter {
     }
   }
 
+  // Get user's LP position for a specific market
+  async getUserLPPosition(marketAddress: string, userAddress: string): Promise<UserLPPosition | null> {
+    try {
+      const provider = this.createReadOnlyProvider();
+      const program = new Program(idl as any, provider);
+      const marketPubkey = new PublicKey(marketAddress);
+      const userPubkey = new PublicKey(userAddress);
+
+      // Get LP Position PDA
+      const [lpPositionPDA] = this.getLPPositionPDA(marketPubkey, userPubkey);
+
+      // Fetch LP position account
+      const accounts = program.account as any;
+      let lpPosition = null;
+
+      // Try lpPosition (Anchor's standard camelCase for LPPosition)
+      if (accounts.lpPosition) {
+        try {
+          lpPosition = await accounts.lpPosition.fetch(lpPositionPDA);
+        } catch {
+          // Account doesn't exist
+        }
+      }
+
+      if (!lpPosition || lpPosition.lpShares?.toNumber() === 0) {
+        return null;
+      }
+
+      // Fetch market data for calculations
+      const market = await this.getMarket(marketAddress);
+      if (!market) return null;
+
+      // Calculate user's position details
+      const lpShares = (lpPosition.lpShares?.toNumber() || 0) / 1e6;
+      const investedUsdc = (lpPosition.investedUsdc?.toNumber() || 0) / 1e6;
+      const createdAt = (lpPosition.createdAt?.toNumber() || 0) * 1000; // Convert to ms
+      const lastAddAt = (lpPosition.lastAddAt?.toNumber() || 0) * 1000;
+
+      // Calculate share percentage
+      const sharePercentage = market.totalLpShares > 0
+        ? (lpShares / market.totalLpShares) * 100
+        : 0;
+
+      // Calculate estimated current value
+      const estimatedValue = market.totalLpShares > 0
+        ? (lpShares / market.totalLpShares) * market.totalPoolValue
+        : 0;
+
+      // Calculate unrealized PnL
+      const unrealizedPnl = estimatedValue - investedUsdc;
+      const unrealizedPnlPercent = investedUsdc > 0
+        ? (unrealizedPnl / investedUsdc) * 100
+        : 0;
+
+      // Calculate holding period
+      const now = Date.now();
+      const holdingDays = createdAt > 0
+        ? Math.floor((now - createdAt) / (24 * 60 * 60 * 1000))
+        : 0;
+
+      // Calculate early exit penalty based on holding period
+      let earlyExitPenaltyPercent = 0;
+      if (holdingDays < 7) {
+        earlyExitPenaltyPercent = 3.0; // 300 bps
+      } else if (holdingDays < 14) {
+        earlyExitPenaltyPercent = 1.5; // 150 bps
+      } else if (holdingDays < 30) {
+        earlyExitPenaltyPercent = 0.5; // 50 bps
+      }
+
+      return {
+        marketAddress,
+        userAddress,
+        lpShares,
+        investedUsdc,
+        sharePercentage,
+        estimatedValue,
+        unrealizedPnl,
+        unrealizedPnlPercent,
+        createdAt,
+        lastAddAt,
+        holdingDays,
+        earlyExitPenaltyPercent,
+      };
+    } catch {
+      // LP position doesn't exist or other error
+      return null;
+    }
+  }
+
+  // Get user's YES/NO token balances for a specific market
+  async getUserTokenBalances(
+    marketAddress: string,
+    userAddress: string
+  ): Promise<{ yesBalance: number; noBalance: number } | null> {
+    try {
+      const market = await this.getMarket(marketAddress);
+      if (!market) return null;
+
+      const userPubkey = new PublicKey(userAddress);
+      const yesTokenMint = new PublicKey(market.yesMint);
+      const noTokenMint = new PublicKey(market.noMint);
+
+      // Get user's ATAs
+      const userYesAta = getAssociatedTokenAddressSync(yesTokenMint, userPubkey);
+      const userNoAta = getAssociatedTokenAddressSync(noTokenMint, userPubkey);
+
+      // Fetch balances
+      let yesBalance = 0;
+      let noBalance = 0;
+
+      try {
+        const yesAccountInfo = await this.connection.getTokenAccountBalance(userYesAta);
+        yesBalance = yesAccountInfo.value.uiAmount || 0;
+      } catch {
+        // Account doesn't exist
+      }
+
+      try {
+        const noAccountInfo = await this.connection.getTokenAccountBalance(userNoAta);
+        noBalance = noAccountInfo.value.uiAmount || 0;
+      } catch {
+        // Account doesn't exist
+      }
+
+      return { yesBalance, noBalance };
+    } catch (error) {
+      console.error('Failed to get user token balances:', error);
+      return null;
+    }
+  }
+
+  // Fix existing market by setting mint authority (for markets created before this fix)
+  // Only the market creator or contract admin can call this
+  async fixMarketMintAuthority(marketAddress: string): Promise<TransactionResult> {
+    if (!this.program || !this.wallet?.publicKey) {
+      return { signature: '', success: false, error: 'Wallet not connected' };
+    }
+
+    try {
+      // Fetch market data to get YES/NO token mints
+      const market = await this.getMarket(marketAddress);
+      if (!market) {
+        return { signature: '', success: false, error: 'Market not found' };
+      }
+
+      // Call setMintAuthority with the market's token mints
+      return await this.setMintAuthority({
+        yesTokenPubkey: market.yesMint,
+        noTokenPubkey: market.noMint,
+      });
+    } catch (error) {
+      console.error('Failed to fix market mint authority:', error);
+      return { signature: '', success: false, error: String(error) };
+    }
+  }
+
   // Step 1: Mint NO token (must be called before createMarket)
   async mintNoToken(noSymbol: string, noUri: string): Promise<{ signature: string; noTokenPubkey: string } | { error: string }> {
     if (!this.program || !this.wallet?.publicKey) {
@@ -353,7 +511,44 @@ export class SolanaAdapter implements IBlockchainAdapter {
     }
   }
 
-  // Step 2: Create market (must call mintNoToken first to get noTokenPubkey)
+  // Step 2: Set mint authority (transfer YES/NO token mint authority to market PDA)
+  // This must be called after createMarket and before addLiquidity
+  async setMintAuthority(params: { yesTokenPubkey: string; noTokenPubkey: string }): Promise<TransactionResult> {
+    if (!this.program || !this.wallet?.publicKey) {
+      return { signature: '', success: false, error: 'Wallet not connected' };
+    }
+
+    try {
+      const [globalVault] = this.getGlobalPDA();
+      const [globalConfig] = this.getConfigPDA();
+
+      const yesToken = new PublicKey(params.yesTokenPubkey);
+      const noToken = new PublicKey(params.noTokenPubkey);
+
+      // Derive market PDA from YES and NO token mints
+      const [market] = this.getMarketPDAFromMints(yesToken, noToken);
+
+      const signature = await (this.program.methods as any)
+        .setMintAuthority()
+        .accounts({
+          globalConfig,
+          globalVault,
+          yesToken,
+          noToken,
+          market,
+          authority: this.wallet.publicKey,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        })
+        .rpc();
+
+      return { signature, success: true };
+    } catch (error) {
+      console.error('Failed to set mint authority:', error);
+      return { signature: '', success: false, error: String(error) };
+    }
+  }
+
+  // Step 3: Create market (must call mintNoToken first to get noTokenPubkey)
   async createMarket(params: CreateMarketParams & { noTokenPubkey?: string }): Promise<TransactionResult> {
     if (!this.program || !this.wallet?.publicKey) {
       return { signature: '', success: false, error: 'Wallet not connected' };
@@ -423,7 +618,7 @@ export class SolanaAdapter implements IBlockchainAdapter {
         initialYesProb: params.initialYesProb, // 2000-8000 basis points
       };
 
-      const signature = await (this.program.methods as any)
+      const createMarketSignature = await (this.program.methods as any)
         .createMarket(contractParams)
         .accounts({
           globalConfig,
@@ -447,7 +642,28 @@ export class SolanaAdapter implements IBlockchainAdapter {
         .signers([yesToken])
         .rpc();
 
-      return { signature, success: true };
+      // Wait for create market to confirm
+      await this.connection.confirmTransaction(createMarketSignature, 'confirmed');
+
+      // Step 3: Set mint authority - transfer YES/NO token mint authority to market PDA
+      // This is required before addLiquidity can work
+      const setAuthResult = await this.setMintAuthority({
+        yesTokenPubkey: yesToken.publicKey.toBase58(),
+        noTokenPubkey: noTokenPubkey.toBase58(),
+      });
+
+      if (!setAuthResult.success) {
+        console.error('Failed to set mint authority:', setAuthResult.error);
+        // Return the create market signature but note the authority transfer failed
+        return {
+          signature: createMarketSignature,
+          success: false,
+          marketAddress: market.toBase58(),
+          error: `Market created but mint authority transfer failed: ${setAuthResult.error}. Call setMintAuthority manually before adding liquidity.`,
+        };
+      }
+
+      return { signature: createMarketSignature, success: true, marketAddress: market.toBase58() };
     } catch (error) {
       console.error('Failed to create market:', error);
       return { signature: '', success: false, error: String(error) };
@@ -547,9 +763,11 @@ export class SolanaAdapter implements IBlockchainAdapter {
       }
 
       // Build swap instruction manually for better control
+      // Note: Optional accounts (recipient, recipient_yes_ata, recipient_no_ata) are omitted
+      // when not using a different recipient - they should not be passed at all
       const swapKeys = [
         { pubkey: configPDA, isSigner: false, isWritable: true },
-        { pubkey: config.teamWallet, isSigner: false, isWritable: true },
+        { pubkey: config.teamWallet, isSigner: false, isWritable: false },
         { pubkey: marketPDA, isSigner: false, isWritable: true },
         { pubkey: globalVaultPDA, isSigner: false, isWritable: true },
         { pubkey: yesTokenMint, isSigner: false, isWritable: false },
@@ -561,13 +779,14 @@ export class SolanaAdapter implements IBlockchainAdapter {
         { pubkey: userInfoPDA, isSigner: false, isWritable: true },
         { pubkey: usdcMint, isSigner: false, isWritable: false },
         { pubkey: marketUsdcAta, isSigner: false, isWritable: true },
-        { pubkey: marketUsdcVaultPDA, isSigner: false, isWritable: true },
+        { pubkey: marketUsdcVaultPDA, isSigner: false, isWritable: false },
         { pubkey: userUsdcAta, isSigner: false, isWritable: true },
         { pubkey: teamUsdcAta, isSigner: false, isWritable: true },
         { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true },
-        { pubkey: this.wallet.publicKey, isSigner: false, isWritable: true }, // recipient
-        { pubkey: userYesAta, isSigner: false, isWritable: true }, // recipient_yes_ata
-        { pubkey: userNoAta, isSigner: false, isWritable: true }, // recipient_no_ata
+        // Optional accounts: use program ID to indicate "None" for Anchor
+        { pubkey: new PublicKey(this.dynamicConfig.programId), isSigner: false, isWritable: false }, // recipient (None)
+        { pubkey: new PublicKey(this.dynamicConfig.programId), isSigner: false, isWritable: false }, // recipient_yes_ata (None)
+        { pubkey: new PublicKey(this.dynamicConfig.programId), isSigner: false, isWritable: false }, // recipient_no_ata (None)
         { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
         { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
         { pubkey: ASSOCIATED_TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
@@ -577,15 +796,17 @@ export class SolanaAdapter implements IBlockchainAdapter {
       const coder = new BorshCoder(idl as any);
       const amountBN = new BN(Math.floor(params.amount * USDC_MULTIPLIER));
       const direction = params.direction === 'buy' ? 0 : 1;
-      const tokenType = params.tokenType === 'yes' ? 0 : 1;
+      // Contract defines: 0=NO, 1=YES
+      const tokenType = params.tokenType === 'yes' ? 1 : 0;
       const minOutput = new BN(0); // Can be calculated with slippage
       const deadline = new BN(Math.floor(Date.now() / 1000) + 300); // 5 minutes
 
+      // Use snake_case field names to match IDL exactly
       const swapData = coder.instruction.encode('swap', {
         amount: amountBN,
         direction,
-        tokenType,
-        minimumReceiveAmount: minOutput,
+        token_type: tokenType,
+        minimum_receive_amount: minOutput,
         deadline,
       });
 
@@ -601,18 +822,82 @@ export class SolanaAdapter implements IBlockchainAdapter {
         .add(ComputeBudgetProgram.requestHeapFrame({ bytes: 256 * 1024 }))
         .add(swapIx);
 
+      // Get recent blockhash for simulation
+      const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash('confirmed');
+      tx.recentBlockhash = blockhash;
+      tx.feePayer = this.wallet.publicKey;
+
+      // Simulate transaction first to get detailed error
+      const simulation = await this.connection.simulateTransaction(tx);
+
+      if (simulation.value.err) {
+
+        // Parse common errors for user-friendly messages
+        const logs = simulation.value.logs || [];
+        const errorLog = logs.find((log: string) => log.includes('Error Message:'));
+
+        if (errorLog?.includes('TradeSizeTooLarge')) {
+          const maxTradeAmount = market.totalLiquidity * 0.1;
+          return {
+            signature: '',
+            success: false,
+            error: `Trade size too large. Maximum allowed is 10% of pool reserve (~${maxTradeAmount.toFixed(2)} USDC). Try a smaller amount.`,
+          };
+        }
+
+        if (errorLog?.includes('InsufficientLiquidity')) {
+          return {
+            signature: '',
+            success: false,
+            error: `Insufficient liquidity in the pool. The pool doesn't have enough reserves to complete this trade.`,
+          };
+        }
+
+        return {
+          signature: '',
+          success: false,
+          error: errorLog || `Simulation failed: ${JSON.stringify(simulation.value.err)}`,
+        };
+      }
+
       // Send transaction
       const signature = await this.wallet.sendTransaction(tx, this.connection, {
-        skipPreflight: false,
+        skipPreflight: true, // Skip preflight since we already simulated
         preflightCommitment: 'confirmed',
       });
 
-      await this.connection.confirmTransaction(signature, 'confirmed');
+      await this.connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, 'confirmed');
 
       return { signature, success: true };
     } catch (error: any) {
       console.error('Failed to swap:', error);
-      return { signature: '', success: false, error: error.message || String(error) };
+
+      // Extract more detailed error message
+      let errorMessage = error.message || String(error);
+
+      // Check for Solana program errors
+      if (error.logs) {
+        console.error('Transaction logs:', error.logs);
+        const programError = error.logs.find((log: string) => log.includes('Error') || log.includes('failed'));
+        if (programError) {
+          errorMessage = programError;
+        }
+      }
+
+      // Check for simulation error
+      if (error.simulationResponse) {
+        console.error('Simulation response:', error.simulationResponse);
+        if (error.simulationResponse.err) {
+          errorMessage = JSON.stringify(error.simulationResponse.err);
+        }
+      }
+
+      // Check for SendTransactionError details
+      if (error.transactionError) {
+        errorMessage = JSON.stringify(error.transactionError);
+      }
+
+      return { signature: '', success: false, error: errorMessage };
     }
   }
 
@@ -859,6 +1144,8 @@ export class SolanaAdapter implements IBlockchainAdapter {
       let errorMessage = error.message || String(error);
       if (errorMessage.includes('ValueTooSmall')) {
         errorMessage = 'Amount too small. Minimum liquidity is 10 USDC.';
+      } else if (errorMessage.includes('MintAuthorityNotTransferred') || errorMessage.includes('6071')) {
+        errorMessage = 'Market mint authority has not been transferred. The market creator needs to call setMintAuthority first.';
       }
 
       return { signature: '', success: false, error: errorMessage };
@@ -1008,6 +1295,22 @@ export class SolanaAdapter implements IBlockchainAdapter {
     const createdAtSeconds = account.createdAt?.toNumber() || 0;
     const createdAtMs = createdAtSeconds > 0 ? createdAtSeconds * 1000 : Date.now();
 
+    // Get prices first (needed for total pool value calculation)
+    const yesPrice = this.calculatePrice(account, 'yes');
+    const noPrice = this.calculatePrice(account, 'no');
+
+    // Get pool reserves (in USDC decimals, divide by 1e6)
+    const poolCollateralReserve = ((account.poolCollateralReserve || account.totalLiquidity)?.toNumber() || 0) / 1e6;
+    const poolYesReserve = ((account.poolYesReserve)?.toNumber() || 0) / 1e6;
+    const poolNoReserve = ((account.poolNoReserve)?.toNumber() || 0) / 1e6;
+    const totalLpShares = ((account.totalLpShares)?.toNumber() || 0) / 1e6;
+
+    // Calculate total pool value: USDC + (YES tokens * YES price) + (NO tokens * NO price)
+    // This represents the total economic value of the pool
+    const yesValue = poolYesReserve * yesPrice;
+    const noValue = poolNoReserve * noPrice;
+    const totalPoolValue = poolCollateralReserve + yesValue + noValue;
+
     return {
       address: publicKey.toBase58(),
       // Contract uses 'displayName' for the market name/question
@@ -1021,10 +1324,15 @@ export class SolanaAdapter implements IBlockchainAdapter {
       status: this.getMarketStatus(account),
       // Contract uses lmsrB for b parameter
       bParameter: (account.lmsrB || account.bParameter)?.toNumber() || 500,
-      // Contract uses poolCollateralReserve for liquidity
-      totalLiquidity: ((account.poolCollateralReserve || account.totalLiquidity)?.toNumber() || 0) / 1e6,
-      yesPrice: this.calculatePrice(account, 'yes'),
-      noPrice: this.calculatePrice(account, 'no'),
+      // Liquidity breakdown
+      totalLiquidity: poolCollateralReserve,
+      poolYesReserve,
+      poolNoReserve,
+      totalLpShares,
+      totalPoolValue,
+      // Prices
+      yesPrice,
+      noPrice,
       createdAt: createdAtMs,
     };
   }
@@ -1040,12 +1348,18 @@ export class SolanaAdapter implements IBlockchainAdapter {
   }
 
   private calculatePrice(account: any, tokenType: 'yes' | 'no'): number {
-    // Contract uses lmsrB, lmsrQYes, lmsrQNo
-    const b = (account.lmsrB || account.bParameter)?.toNumber() || 500;
-    const qYes = (account.lmsrQYes || account.qYes)?.toNumber() || 0;
-    const qNo = (account.lmsrQNo || account.qNo)?.toNumber() || 0;
+    // Contract stores values with 6 decimal places (like USDC)
+    // b and q values need to be in the same scale for the formula to work
+    const rawB = (account.lmsrB || account.lmsr_b || account.bParameter)?.toNumber() || 500000000;
+    const rawQYes = (account.lmsrQYes || account.lmsr_q_yes || account.qYes)?.toNumber() || 0;
+    const rawQNo = (account.lmsrQNo || account.lmsr_q_no || account.qNo)?.toNumber() || 0;
 
-    // LMSR price formula
+    // Scale all values consistently (divide by 1e6)
+    const b = rawB / 1e6;
+    const qYes = rawQYes / 1e6;
+    const qNo = rawQNo / 1e6;
+
+    // LMSR price formula: price = exp(q/b) / sum(exp(qi/b))
     const expYes = Math.exp(qYes / b);
     const expNo = Math.exp(qNo / b);
     const total = expYes + expNo;

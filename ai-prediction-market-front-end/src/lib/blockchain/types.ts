@@ -9,6 +9,7 @@ export interface TransactionResult {
   signature: string;
   success: boolean;
   error?: string;
+  marketAddress?: string; // Set when creating a market
 }
 
 // Create market params (matches contract's CreateMarketParams struct)
@@ -38,6 +39,10 @@ export interface IBlockchainAdapter {
   // Market operations (wallet required)
   createMarket(params: CreateMarketParams): Promise<TransactionResult>;
 
+  // Fix market mint authority (for markets created before setMintAuthority fix)
+  // Only market creator or admin can call this
+  fixMarketMintAuthority?(marketAddress: string): Promise<TransactionResult>;
+
   // Trading operations
   swap(params: SwapParams): Promise<TransactionResult>;
   mintCompleteSet(params: MintRedeemParams): Promise<TransactionResult>;
@@ -49,6 +54,12 @@ export interface IBlockchainAdapter {
 
   // User data
   getUserPositions(userAddress: string): Promise<import('@/types').UserPosition[]>;
+  getUserLPPosition?(marketAddress: string, userAddress: string): Promise<import('@/types').UserLPPosition | null>;
+  getUserTokenBalances?(marketAddress: string, userAddress: string): Promise<{ yesBalance: number; noBalance: number } | null>;
+
+  // Admin operations (optional - some chains may not support)
+  getAuthority?(): Promise<string | null>;
+  isWhitelisted?(address: string): Promise<boolean>;
 }
 
 // Factory function type for creating adapters

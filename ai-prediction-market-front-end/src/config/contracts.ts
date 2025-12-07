@@ -13,7 +13,7 @@ export const contractConfig = {
     return this.usdcMint[env.network as keyof typeof this.usdcMint] || '';
   },
 
-  // PDA seeds
+  // PDA seeds (must match contract/programs/prediction-market/src/constants.rs)
   seeds: {
     CONFIG: 'config',
     GLOBAL: 'global',
@@ -21,7 +21,7 @@ export const contractConfig = {
     MARKET_USDC_VAULT: 'market_usdc_vault',
     USERINFO: 'userinfo',
     METADATA: 'metadata',
-    WHITELIST: 'whitelist',
+    WHITELIST: 'wl-seed', // Contract uses 'wl-seed' not 'whitelist'
     LP_POSITION: 'lp_position',
   } as const,
 

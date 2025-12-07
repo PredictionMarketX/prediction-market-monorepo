@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useWallet } from '@solana/wallet-adapter-react';
-import { Card, CardContent, CardHeader, CardTitle, Button } from '@/components/ui';
+import { Card, CardContent, Button } from '@/components/ui';
 import { useIsAdmin } from '@/features/admin/hooks/useIsAdmin';
 import { adminPanelConfig, getAccessibleItems } from '@/features/admin/config';
 import type { AdminPanelItem, AdminPanelSection } from '@/features/admin/types';

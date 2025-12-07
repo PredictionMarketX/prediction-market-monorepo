@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-toastify';
 import { marketKeys, CreateMarketFormValues } from '../types';
-import { createMarketDirect, createMarketViaBackend } from '../api';
+import { createMarketDirect, createMarketViaBackend, linkMetadataToMarket } from '../api';
 import { useBlockchain } from '@/lib/blockchain';
 import { apiClient } from '@/lib/api/client';
 import { solanaConfig } from '@/lib/blockchain/solana/config';
@@ -36,22 +36,34 @@ export function useCreateMarket() {
   return useMutation({
     mutationFn: async ({
       params,
+      metadataId,
       options = {},
     }: {
       params: CreateMarketParams;
+      metadataId?: string | null;
       options?: CreateMarketOptions;
     }) => {
-      if (options.useX402) {
-        return createMarketViaBackend(
-          {
-            ...params,
-            creatorAddress: address || undefined,
-          },
-          options.paymentHeader
-        );
-      } else {
-        return createMarketDirect(params);
+      const result = options.useX402
+        ? await createMarketViaBackend(
+            {
+              ...params,
+              creatorAddress: address || undefined,
+            },
+            options.paymentHeader
+          )
+        : await createMarketDirect(params);
+
+      // Link metadata to market address if we have both
+      if (metadataId && result?.marketAddress) {
+        try {
+          await linkMetadataToMarket(metadataId, result.marketAddress);
+        } catch (error) {
+          // Don't fail the whole operation if linking fails - metadata can be linked later
+          console.warn('Failed to link metadata to market:', error);
+        }
       }
+
+      return result;
     },
     onSuccess: () => {
       // Invalidate markets list to refetch
@@ -64,8 +76,13 @@ export function useCreateMarket() {
   });
 }
 
-// Generate metadata URI - tries backend first, falls back to data URI
-async function generateMetadataUri(values: CreateMarketFormValues): Promise<string> {
+// Generate metadata and return both ID and URI
+interface MetadataResult {
+  id: string | null;
+  uri: string;
+}
+
+async function generateMetadata(values: CreateMarketFormValues): Promise<MetadataResult> {
   const chainId = getCurrentChainId();
 
   try {
@@ -79,14 +96,14 @@ async function generateMetadataUri(values: CreateMarketFormValues): Promise<stri
       resolutionSource: values.resolutionSource,
     });
 
-    if (response.success && response.data?.url) {
-      return response.data.url;
+    if (response.success && response.data?.url && response.data?.id) {
+      return { id: response.data.id, uri: response.data.url };
     }
   } catch (error) {
     console.warn('Failed to store metadata in backend, using data URI fallback:', error);
   }
 
-  // Fallback: use data URI (no external storage needed)
+  // Fallback: use data URI (no external storage needed, no ID to link)
   const metadata = {
     chainId,
     name: values.question,
@@ -98,14 +115,20 @@ async function generateMetadataUri(values: CreateMarketFormValues): Promise<stri
   };
 
   const jsonString = JSON.stringify(metadata);
-  return `data:application/json;base64,${btoa(jsonString)}`;
+  return { id: null, uri: `data:application/json;base64,${btoa(jsonString)}` };
+}
+
+// Result of form conversion - includes metadata ID for linking
+export interface FormToParamsResult {
+  params: CreateMarketParams;
+  metadataId: string | null;
 }
 
 // Helper to convert form values to params
 export async function formValuesToParams(
   values: CreateMarketFormValues,
   currentSlot?: number
-): Promise<CreateMarketParams> {
+): Promise<FormToParamsResult> {
   const now = new Date();
   const slot = currentSlot || 0;
 
@@ -126,15 +149,18 @@ export async function formValuesToParams(
     endingSlot = dateToSlot(endDate, slot, now);
   }
 
-  // Get metadata URI (from backend or fallback to data URI)
-  const yesUri = await generateMetadataUri(values);
+  // Get metadata (from backend or fallback to data URI)
+  const { id: metadataId, uri: yesUri } = await generateMetadata(values);
 
   return {
-    yesSymbol: values.yesSymbol,
-    yesUri,
-    displayName: values.question.slice(0, 64), // Max 64 chars
-    initialYesProb,
-    startSlot,
-    endingSlot,
+    params: {
+      yesSymbol: values.yesSymbol,
+      yesUri,
+      displayName: values.question.slice(0, 64), // Max 64 chars
+      initialYesProb,
+      startSlot,
+      endingSlot,
+    },
+    metadataId,
   };
 }

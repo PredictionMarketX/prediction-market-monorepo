@@ -3,15 +3,16 @@
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui';
 import { formatPercent, formatCurrency, formatRelativeTime } from '@/lib/utils';
-import type { Market } from '@/types';
+import type { MarketWithMetadata } from '@/features/markets/types';
 
 interface MarketCardProps {
-  market: Market;
+  market: MarketWithMetadata;
 }
 
 export function MarketCard({ market }: MarketCardProps) {
   const yesPercent = market.yesPrice * 100;
   const noPercent = market.noPrice * 100;
+  const { metadata } = market;
 
   return (
     <Link href={`/markets/${market.address}`}>
@@ -20,28 +21,49 @@ export function MarketCard({ market }: MarketCardProps) {
         className="hover:border-blue-500 transition-colors cursor-pointer h-full"
       >
         <CardContent>
-          {/* Status badge */}
+          {/* Status badge and category */}
           <div className="flex justify-between items-start mb-3">
-            <span
-              className={`px-2 py-1 text-xs font-medium rounded-full ${
-                market.status === 'active'
-                  ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                  : market.status === 'resolved'
-                  ? 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
-                  : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-              }`}
-            >
-              {market.status.charAt(0).toUpperCase() + market.status.slice(1)}
-            </span>
+            <div className="flex items-center gap-2">
+              <span
+                className={`px-2 py-1 text-xs font-medium rounded-full ${
+                  market.status === 'active'
+                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                    : market.status === 'resolved'
+                    ? 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
+                    : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                }`}
+              >
+                {market.status.charAt(0).toUpperCase() + market.status.slice(1)}
+              </span>
+              {metadata?.category && (
+                <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                  {metadata.category}
+                </span>
+              )}
+            </div>
             <span className="text-xs text-gray-500 dark:text-gray-400">
               {formatRelativeTime(market.createdAt)}
             </span>
           </div>
 
           {/* Market question */}
-          <h3 className="font-semibold text-gray-900 dark:text-white mb-4 line-clamp-2">
+          <h3 className="font-semibold text-gray-900 dark:text-white mb-2 line-clamp-2">
             {market.name}
           </h3>
+
+          {/* Description */}
+          {metadata?.description && (
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-3 line-clamp-2">
+              {metadata.description}
+            </p>
+          )}
+
+          {/* Resolution source */}
+          {metadata?.resolutionSource && (
+            <div className="text-xs text-gray-400 dark:text-gray-500 mb-3">
+              Source: {metadata.resolutionSource}
+            </div>
+          )}
 
           {/* Probability bars */}
           <div className="space-y-2 mb-4">

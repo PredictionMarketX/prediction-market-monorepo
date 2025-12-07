@@ -2,28 +2,29 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useWallet } from '@solana/wallet-adapter-react';
-import { getSolanaAdapter } from '@/lib/blockchain';
+import { useBlockchain } from '@/lib/blockchain';
 
 // Dev mode - bypass on-chain checks for development
 const IS_DEV_MODE = process.env.NEXT_PUBLIC_DEV === 'true';
 
 export function useIsAdmin() {
   const { publicKey, connected } = useWallet();
+  const { adapter } = useBlockchain();
   const walletAddress = publicKey?.toBase58();
 
   // Fetch config to check if wallet is the contract authority (on-chain)
   const { data: authority, isLoading: isLoadingAuthority } = useQuery({
     queryKey: ['admin', 'authority'],
     queryFn: async () => {
+      if (!adapter.getAuthority) return null;
       try {
-        const adapter = getSolanaAdapter();
         return await adapter.getAuthority();
       } catch (error) {
         console.error('Failed to fetch authority:', error);
         return null;
       }
     },
-    enabled: connected && !!walletAddress && !IS_DEV_MODE,
+    enabled: connected && !!walletAddress && !IS_DEV_MODE && !!adapter.getAuthority,
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 
@@ -31,17 +32,16 @@ export function useIsAdmin() {
   const { data: isOnChainWhitelisted, isLoading: isLoadingWhitelist } = useQuery({
     queryKey: ['admin', 'whitelist', walletAddress],
     queryFn: async () => {
-      if (!walletAddress) return false;
+      if (!walletAddress || !adapter.isWhitelisted) return false;
 
       try {
-        const adapter = getSolanaAdapter();
         return await adapter.isWhitelisted(walletAddress);
       } catch (error) {
         console.error('Failed to check whitelist:', error);
         return false;
       }
     },
-    enabled: connected && !!walletAddress && !IS_DEV_MODE,
+    enabled: connected && !!walletAddress && !IS_DEV_MODE && !!adapter.isWhitelisted,
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 

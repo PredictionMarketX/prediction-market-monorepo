@@ -37,6 +37,20 @@ export async function initDatabase() {
       END $$;
     `;
 
+    // Add market_address column if it doesn't exist (for linking metadata to on-chain markets)
+    await sql`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'market_metadata' AND column_name = 'market_address'
+        ) THEN
+          ALTER TABLE market_metadata ADD COLUMN market_address TEXT;
+          CREATE INDEX IF NOT EXISTS idx_market_metadata_market_address ON market_metadata(market_address);
+        END IF;
+      END $$;
+    `;
+
     logger.info('Database initialized successfully');
   } catch (error) {
     logger.error({ error }, 'Failed to initialize database');
