@@ -22,6 +22,21 @@ const envSchema = z.object({
 
   // Database (Neon)
   DATABASE_URL: z.string().optional(),
+
+  // RabbitMQ
+  RABBITMQ_URL: z.string().optional(),
+
+  // OpenAI
+  OPENAI_API_KEY: z.string().optional(),
+  OPENAI_MODEL: z.string().default('gpt-3.5-turbo'),
+
+  // AI Rate Limits
+  RATE_LIMIT_PROPOSE_PER_MIN: z.coerce.number().default(5),
+  RATE_LIMIT_PROPOSE_PER_HOUR: z.coerce.number().default(20),
+  RATE_LIMIT_PROPOSE_PER_DAY: z.coerce.number().default(50),
+
+  // Internal JWT for workers
+  INTERNAL_JWT_SECRET: z.string().optional(),
 });
 
 const parseEnv = () => {

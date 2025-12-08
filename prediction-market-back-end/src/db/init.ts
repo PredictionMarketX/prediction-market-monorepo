@@ -1,4 +1,5 @@
 import { getDb, isDatabaseConfigured } from './client.js';
+import { runMigrations } from './migrate.js';
 import { logger } from '../utils/logger.js';
 
 export async function initDatabase() {
@@ -10,7 +11,14 @@ export async function initDatabase() {
   const sql = getDb();
 
   try {
-    // Create market_metadata table if not exists
+    // Test connection
+    await sql`SELECT 1`;
+    logger.info('Database connection established');
+
+    // Run migrations
+    await runMigrations();
+
+    // Legacy: Create market_metadata table if not exists (for backwards compatibility)
     await sql`
       CREATE TABLE IF NOT EXISTS market_metadata (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -37,7 +45,7 @@ export async function initDatabase() {
       END $$;
     `;
 
-    // Add market_address column if it doesn't exist (for linking metadata to on-chain markets)
+    // Add market_address column if it doesn't exist
     await sql`
       DO $$
       BEGIN
@@ -57,3 +65,5 @@ export async function initDatabase() {
     throw error;
   }
 }
+
+export { runMigrations, getMigrationStatus } from './migrate.js';
