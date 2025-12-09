@@ -30,8 +30,11 @@ process.env.WORKER_TYPE = 'crawler';
 
 const logger = createWorkerLogger('crawler');
 
-// RSS polling interval (configurable via env, default 1 hour for testing)
-const RSS_POLL_INTERVAL_MS = parseInt(process.env.RSS_POLL_INTERVAL_MINUTES || '60', 10) * 60 * 1000;
+// RSS polling interval (15 minutes)
+const RSS_POLL_INTERVAL_MS = 15 * 60 * 1000;
+
+// Max items to process per feed per poll (prevents flooding)
+const MAX_ITEMS_PER_FEED = 3;
 
 // Parser instance
 const parser = new Parser({
@@ -142,7 +145,10 @@ async function processFeed(feed: RssFeed): Promise<number> {
 
     const result = await parser.parseURL(feed.url);
 
-    for (const item of result.items) {
+    // Only process top N items to prevent flooding
+    const itemsToProcess = result.items.slice(0, MAX_ITEMS_PER_FEED);
+
+    for (const item of itemsToProcess) {
       try {
         const title = item.title || '';
         const content = item.contentSnippet || item.content || '';
