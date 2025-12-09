@@ -225,7 +225,7 @@ async function processNewsItem(message: NewsRawMessage): Promise<void> {
   // Try keyword detection first
   let { eventType, category } = detectEventType(fullText);
   let entities: string[] = [];
-  let relevantText = message.content.slice(0, 500);
+  const relevantText = message.content.slice(0, 500);
 
   // If no event type detected, use LLM
   if (!eventType) {

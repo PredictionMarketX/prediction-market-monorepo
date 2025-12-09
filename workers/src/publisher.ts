@@ -34,6 +34,13 @@ process.env.WORKER_TYPE = 'publisher';
 
 const logger = createWorkerLogger('publisher');
 
+// Market creation defaults
+const MARKET_DEFAULTS = {
+  INITIAL_YES_PROB: 5000, // 50% in basis points (0-10000)
+  MAX_DISPLAY_NAME_LENGTH: 64,
+  MAX_SYMBOL_PREFIX_LENGTH: 6,
+} as const;
+
 /**
  * Get AI version from database config
  */
@@ -93,7 +100,7 @@ function generateSymbol(title: string, isYes: boolean): string {
   const prefix = title
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, '')
-    .substring(0, 6);
+    .substring(0, MARKET_DEFAULTS.MAX_SYMBOL_PREFIX_LENGTH);
   return `${prefix}${isYes ? 'Y' : 'N'}`;
 }
 
@@ -161,7 +168,7 @@ async function processPublish(message: MarketPublishMessage): Promise<void> {
 
   // Prepare market parameters
   const title = market.title as string;
-  const displayName = title.substring(0, 64); // Max 64 chars for display name
+  const displayName = title.substring(0, MARKET_DEFAULTS.MAX_DISPLAY_NAME_LENGTH);
   const yesSymbol = generateSymbol(title, true);
   const noSymbol = generateSymbol(title, false);
   const yesUri = generateMetadataUri(title, true);
@@ -180,7 +187,7 @@ async function processPublish(message: MarketPublishMessage): Promise<void> {
       yesUri,
       noSymbol,
       noUri,
-      initialYesProb: 5000, // 50%
+      initialYesProb: MARKET_DEFAULTS.INITIAL_YES_PROB,
     });
 
     logger.info(
