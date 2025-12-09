@@ -1,0 +1,25 @@
+{
+  "name": "x402-ploymarket",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build:types": "pnpm --filter @x402/shared-types build",
+    "dev:frontend": "pnpm --filter ai-prediction-market-front-end dev",
+    "dev:backend": "pnpm --filter prediction-market-back-end dev",
+    "dev:workers": "pnpm --filter workers dev:generator & pnpm --filter workers dev:validator & pnpm --filter workers dev:publisher & pnpm --filter workers dev:scheduler",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "test:workers": "node scripts/test-workers.js",
+    "test:backend": "node scripts/test-backend.js",
+    "test": "node scripts/test-workers.js"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@8.15.0"
+}
