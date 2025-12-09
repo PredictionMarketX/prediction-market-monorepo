@@ -94,7 +94,6 @@ async function saveNewsItem(item: {
   content: string;
   publishedAt: Date;
   contentHash: string;
-  categoryHint?: string;
 }): Promise<string> {
   const sql = getDb();
   const [result] = await sql`
@@ -105,7 +104,6 @@ async function saveNewsItem(item: {
       content,
       published_at,
       content_hash,
-      category_hint,
       status
     )
     VALUES (
@@ -115,7 +113,6 @@ async function saveNewsItem(item: {
       ${item.content},
       ${item.publishedAt},
       ${item.contentHash},
-      ${item.categoryHint || null},
       'ingested'
     )
     RETURNING id
@@ -170,7 +167,6 @@ async function processFeed(feed: RssFeed): Promise<number> {
           content,
           publishedAt,
           contentHash,
-          categoryHint: feed.category,
         });
 
         // Publish to queue
