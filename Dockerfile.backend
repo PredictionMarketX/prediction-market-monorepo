@@ -42,6 +42,9 @@ COPY --from=builder /app/prediction-market-back-end/dist ./prediction-market-bac
 # Copy IDL file needed at runtime
 COPY prediction-market-back-end/src/blockchain/solana/idl ./prediction-market-back-end/dist/blockchain/solana/idl
 
+# Copy SQL migration files needed at runtime
+COPY prediction-market-back-end/src/db/migrations ./prediction-market-back-end/dist/db/migrations
+
 WORKDIR /app/prediction-market-back-end
 
 EXPOSE 3001
