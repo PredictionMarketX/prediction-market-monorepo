@@ -372,7 +372,8 @@ export class SolanaClient {
       totalLiquidity: (account.totalLiquidity?.toNumber() || 0) / decimalMultiplier,
       yesPrice: this.calculatePrice(account, 'yes'),
       noPrice: this.calculatePrice(account, 'no'),
-      createdAt: account.createdAt?.toNumber() || Date.now(),
+      // Contract stores createdAt as Unix timestamp in seconds, convert to milliseconds
+      createdAt: account.createdAt?.toNumber() ? account.createdAt.toNumber() * 1000 : Date.now(),
     };
   }
 

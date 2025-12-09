@@ -83,9 +83,10 @@ export class MarketService {
       totalPoolValue: 0,
       yesPrice: MARKET_DEFAULTS.YES_PRICE,
       noPrice: MARKET_DEFAULTS.NO_PRICE,
+      // Return timestamp in milliseconds (frontend formatRelativeTime expects ms)
       createdAt: dbMarket.published_at
-        ? Math.floor(dbMarket.published_at.getTime() / 1000)
-        : Math.floor(dbMarket.created_at.getTime() / 1000),
+        ? dbMarket.published_at.getTime()
+        : dbMarket.created_at.getTime(),
       metadata: {
         question: dbMarket.title,
         description: dbMarket.description || undefined,
