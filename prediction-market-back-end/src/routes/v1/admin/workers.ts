@@ -355,6 +355,9 @@ export async function adminWorkerRoutes(app: FastifyInstance) {
         const sql = getDb();
 
         // Upsert heartbeat
+        const now = new Date();
+        const lastErrorAt = last_error ? now : null;
+
         await sql`
           INSERT INTO worker_heartbeats (
             worker_type,
@@ -373,28 +376,28 @@ export async function adminWorkerRoutes(app: FastifyInstance) {
             ${workerType},
             ${instance_id},
             ${status},
-            NOW(),
+            ${now},
             ${messages_processed},
             ${messages_failed},
             ${current_queue_size ?? null},
             ${last_error ?? null},
-            ${last_error ? sql`NOW()` : null},
+            ${lastErrorAt},
             ${status === 'error' ? 1 : 0},
             ${hostname ?? null},
             ${pid ?? null}
           )
           ON CONFLICT (worker_type, worker_instance_id) DO UPDATE
           SET
-            status = ${status},
-            last_heartbeat = NOW(),
-            messages_processed = worker_heartbeats.messages_processed + ${messages_processed},
-            messages_failed = worker_heartbeats.messages_failed + ${messages_failed},
-            current_queue_size = ${current_queue_size ?? null},
-            last_error = COALESCE(${last_error ?? null}, worker_heartbeats.last_error),
-            last_error_at = CASE WHEN ${last_error ?? null} IS NOT NULL THEN NOW() ELSE worker_heartbeats.last_error_at END,
-            consecutive_errors = CASE WHEN ${status} = 'error' THEN worker_heartbeats.consecutive_errors + 1 ELSE 0 END,
-            hostname = COALESCE(${hostname ?? null}, worker_heartbeats.hostname),
-            pid = COALESCE(${pid ?? null}, worker_heartbeats.pid)
+            status = EXCLUDED.status,
+            last_heartbeat = EXCLUDED.last_heartbeat,
+            messages_processed = worker_heartbeats.messages_processed + EXCLUDED.messages_processed,
+            messages_failed = worker_heartbeats.messages_failed + EXCLUDED.messages_failed,
+            current_queue_size = EXCLUDED.current_queue_size,
+            last_error = COALESCE(EXCLUDED.last_error, worker_heartbeats.last_error),
+            last_error_at = CASE WHEN EXCLUDED.last_error IS NOT NULL THEN EXCLUDED.last_heartbeat ELSE worker_heartbeats.last_error_at END,
+            consecutive_errors = CASE WHEN EXCLUDED.status = 'error' THEN worker_heartbeats.consecutive_errors + 1 ELSE 0 END,
+            hostname = COALESCE(EXCLUDED.hostname, worker_heartbeats.hostname),
+            pid = COALESCE(EXCLUDED.pid, worker_heartbeats.pid)
         `;
 
         // Check if worker is enabled
