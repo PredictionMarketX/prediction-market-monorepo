@@ -19,6 +19,11 @@ import {
   closeQueue,
   publishNewsRaw,
   type NewsRawMessage,
+  startHeartbeat,
+  stopHeartbeat,
+  recordSuccess,
+  recordFailure,
+  setIdle,
 } from './shared/index.js';
 
 // Override worker type
@@ -295,6 +300,9 @@ async function main(): Promise<void> {
   // Validate required environment variables
   validateEnv(['DATABASE_URL', 'RABBITMQ_URL']);
 
+  // Start heartbeat reporting to backend
+  startHeartbeat({ workerType: 'crawler', intervalMs: 30000 });
+
   // Connect to services
   await initializeQueues();
   logger.info('Connected to RabbitMQ and queues initialized');
@@ -304,11 +312,28 @@ async function main(): Promise<void> {
   await sql`SELECT 1`;
   logger.info('Connected to database');
 
+  // Mark as idle while waiting for poll interval
+  setIdle();
+
   // Initial poll
-  await pollAllFeeds();
+  try {
+    await pollAllFeeds();
+    recordSuccess();
+  } catch (error) {
+    const err = error as Error;
+    recordFailure(err.message);
+  }
 
   // Set up periodic polling
-  const pollInterval = setInterval(pollAllFeeds, RSS_POLL_INTERVAL_MS);
+  const pollInterval = setInterval(async () => {
+    try {
+      await pollAllFeeds();
+      recordSuccess();
+    } catch (error) {
+      const err = error as Error;
+      recordFailure(err.message);
+    }
+  }, RSS_POLL_INTERVAL_MS);
   logger.info(
     { intervalMs: RSS_POLL_INTERVAL_MS },
     'Started RSS polling scheduler'
@@ -318,6 +343,7 @@ async function main(): Promise<void> {
   const shutdown = async () => {
     logger.info('Shutting down crawler worker');
     clearInterval(pollInterval);
+    await stopHeartbeat();
     await closeQueue();
     await closeDb();
     process.exit(0);

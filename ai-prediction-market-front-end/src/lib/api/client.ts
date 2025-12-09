@@ -55,6 +55,65 @@ export interface ContractsResponse {
   contracts: ChainContract[];
 }
 
+// Worker types
+export interface WorkerHeartbeat {
+  id: string;
+  worker_type: string;
+  worker_instance_id: string;
+  status: 'starting' | 'running' | 'idle' | 'error' | 'stopped';
+  last_heartbeat: string;
+  messages_processed: number;
+  messages_failed: number;
+  current_queue_size: number | null;
+  last_error: string | null;
+  last_error_at: string | null;
+  consecutive_errors: number;
+  hostname: string | null;
+  pid: number | null;
+  started_at: string;
+}
+
+export interface WorkerConfig {
+  id: string;
+  worker_type: string;
+  display_name: string;
+  description: string | null;
+  enabled: boolean;
+  poll_interval_ms: number | null;
+  cron_expression: string | null;
+  input_queue: string | null;
+  output_queue: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WorkerStatus extends WorkerConfig {
+  heartbeats: WorkerHeartbeat[];
+  is_healthy: boolean;
+  active_instances: number;
+}
+
+export interface WorkersResponse {
+  workers: WorkerStatus[];
+  summary: {
+    total: number;
+    enabled: number;
+    healthy: number;
+    unhealthy: number;
+  };
+}
+
+export interface WorkerDetail extends WorkerConfig {
+  heartbeats: WorkerHeartbeat[];
+  is_healthy: boolean;
+  active_instances: number;
+  metrics: {
+    total_processed_24h: number;
+    total_failed_24h: number;
+    success_rate: string;
+  };
+}
+
 class APIClient {
   private baseUrl: string;
 
@@ -224,6 +283,25 @@ class APIClient {
 
   async getContractByChainId(chainId: string): Promise<ApiResponse<ChainContract>> {
     return this.request<ChainContract>(`/api/config/contracts/${chainId}`);
+  }
+
+  // Worker Management
+  async getWorkers(): Promise<ApiResponse<WorkersResponse>> {
+    return this.request<WorkersResponse>('/api/v1/admin/workers');
+  }
+
+  async getWorker(workerType: string): Promise<ApiResponse<WorkerDetail>> {
+    return this.request<WorkerDetail>(`/api/v1/admin/workers/${workerType}`);
+  }
+
+  async updateWorker(
+    workerType: string,
+    enabled: boolean
+  ): Promise<ApiResponse<WorkerConfig & { message: string }>> {
+    return this.request(`/api/v1/admin/workers/${workerType}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ enabled }),
+    });
   }
 }
 

@@ -10,8 +10,9 @@
 import cron from 'node-cron';
 import { env } from './shared/env.js';
 import { logger } from './shared/logger.js';
-import { getDb } from './shared/db.js';
-import { initializeQueues, publishMarketResolve, publishConfigRefresh } from './shared/queue.js';
+import { getDb, closeDb } from './shared/db.js';
+import { initializeQueues, publishMarketResolve, publishConfigRefresh, closeQueue } from './shared/queue.js';
+import { startHeartbeat, stopHeartbeat, recordSuccess, recordFailure, setIdle } from './shared/heartbeat.js';
 
 /**
  * Check for markets that need resolution
@@ -212,38 +213,74 @@ async function checkStaleJobs(): Promise<void> {
 async function main(): Promise<void> {
   logger.info('Starting Scheduler');
 
+  // Start heartbeat reporting to backend
+  startHeartbeat({ workerType: 'scheduler', intervalMs: 30000 });
+
   // Initialize queue connection
   await initializeQueues();
+
+  // Mark as idle (scheduler is always "idle" between cron runs)
+  setIdle();
 
   // Schedule jobs
   // Check for markets to resolve - every minute
   cron.schedule('* * * * *', async () => {
     logger.debug('Running: checkMarketsForResolution');
-    await checkMarketsForResolution();
+    try {
+      await checkMarketsForResolution();
+      recordSuccess();
+    } catch (error) {
+      const err = error as Error;
+      recordFailure(err.message);
+    }
   });
 
   // Check for markets to finalize - every 5 minutes
   cron.schedule('*/5 * * * *', async () => {
     logger.debug('Running: checkMarketsForFinalization');
-    await checkMarketsForFinalization();
+    try {
+      await checkMarketsForFinalization();
+      recordSuccess();
+    } catch (error) {
+      const err = error as Error;
+      recordFailure(err.message);
+    }
   });
 
   // Cleanup rate limits - every hour
   cron.schedule('0 * * * *', async () => {
     logger.debug('Running: cleanupRateLimits');
-    await cleanupRateLimits();
+    try {
+      await cleanupRateLimits();
+      recordSuccess();
+    } catch (error) {
+      const err = error as Error;
+      recordFailure(err.message);
+    }
   });
 
   // Refresh config - every 15 minutes
   cron.schedule('*/15 * * * *', async () => {
     logger.debug('Running: refreshConfig');
-    await refreshConfig();
+    try {
+      await refreshConfig();
+      recordSuccess();
+    } catch (error) {
+      const err = error as Error;
+      recordFailure(err.message);
+    }
   });
 
   // Check for stale jobs - every 10 minutes
   cron.schedule('*/10 * * * *', async () => {
     logger.debug('Running: checkStaleJobs');
-    await checkStaleJobs();
+    try {
+      await checkStaleJobs();
+      recordSuccess();
+    } catch (error) {
+      const err = error as Error;
+      recordFailure(err.message);
+    }
   });
 
   // Run initial checks
@@ -256,15 +293,16 @@ async function main(): Promise<void> {
 }
 
 // Handle graceful shutdown
-process.on('SIGINT', () => {
-  logger.info('Received SIGINT, shutting down...');
+const shutdown = async () => {
+  logger.info('Shutting down scheduler...');
+  await stopHeartbeat();
+  await closeQueue();
+  await closeDb();
   process.exit(0);
-});
+};
 
-process.on('SIGTERM', () => {
-  logger.info('Received SIGTERM, shutting down...');
-  process.exit(0);
-});
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
 
 // Start the scheduler
 main().catch((error) => {

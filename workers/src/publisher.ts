@@ -22,6 +22,11 @@ import {
   consumeQueue,
   QUEUE_NAMES,
   type MarketPublishMessage,
+  startHeartbeat,
+  stopHeartbeat,
+  recordSuccess,
+  recordFailure,
+  setIdle,
 } from './shared/index.js';
 import { PDA_SEEDS, USDC_DECIMALS } from '@x402/shared-types';
 
@@ -279,6 +284,9 @@ async function main(): Promise<void> {
   // Validate required environment variables
   validateEnv(['DATABASE_URL', 'RABBITMQ_URL', 'SOLANA_RPC_URL', 'PROGRAM_ID']);
 
+  // Start heartbeat reporting to backend
+  startHeartbeat({ workerType: 'publisher', intervalMs: 30000 });
+
   // Check if private key is valid, otherwise use dry run mode
   if (!isValidPrivateKey()) {
     logger.warn('PUBLISHER_PRIVATE_KEY not set or invalid, running in DRY_RUN mode');
@@ -294,15 +302,21 @@ async function main(): Promise<void> {
   await sql`SELECT 1`;
   logger.info('Connected to database');
 
+  // Mark as idle while waiting for messages
+  setIdle();
+
   // Start consuming market publish requests
   await consumeQueue<MarketPublishMessage>(
     QUEUE_NAMES.MARKETS_PUBLISH,
     async (message, ack, nack) => {
       try {
         await processPublish(message);
+        recordSuccess();
         ack();
       } catch (error) {
-        logger.error({ error, draftMarketId: message.draft_market_id }, 'Failed to publish market');
+        const err = error as Error;
+        logger.error({ error: { message: err.message, stack: err.stack, name: err.name }, draftMarketId: message.draft_market_id }, 'Failed to publish market');
+        recordFailure(err.message);
         throw error;
       }
     }
@@ -313,6 +327,7 @@ async function main(): Promise<void> {
   // Graceful shutdown
   const shutdown = async () => {
     logger.info('Shutting down publisher worker');
+    await stopHeartbeat();
     await closeQueue();
     await closeDb();
     process.exit(0);

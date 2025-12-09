@@ -9,14 +9,14 @@ WORKDIR /app
 # Copy workspace files
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
 COPY packages/shared-types ./packages/shared-types
-COPY prediction-market-back-end ./prediction-market-back-end
+COPY workers ./workers
 
 # Install dependencies
 RUN pnpm install --frozen-lockfile
 
-# Build shared-types first, then backend
+# Build shared-types first, then workers
 RUN pnpm --filter @x402/shared-types build
-RUN pnpm --filter prediction-market-back-end build
+RUN pnpm --filter workers build
 
 # Production stage
 FROM node:20-alpine AS runner
@@ -30,20 +30,19 @@ ENV NODE_ENV=production
 # Copy workspace files
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
 COPY packages/shared-types/package.json ./packages/shared-types/
-COPY prediction-market-back-end/package.json ./prediction-market-back-end/
+COPY workers/package.json ./workers/
 
 # Install production dependencies only
 RUN pnpm install --frozen-lockfile --prod
 
 # Copy built files
 COPY --from=builder /app/packages/shared-types/dist ./packages/shared-types/dist
-COPY --from=builder /app/prediction-market-back-end/dist ./prediction-market-back-end/dist
+COPY --from=builder /app/workers/dist ./workers/dist
 
-# Copy IDL file needed at runtime
-COPY prediction-market-back-end/src/blockchain/solana/idl ./prediction-market-back-end/dist/blockchain/solana/idl
+WORKDIR /app/workers
 
-WORKDIR /app/prediction-market-back-end
+# Default to generator worker - override with WORKER_TYPE env var
+ENV WORKER_TYPE=generator
 
-EXPOSE 3001
-
-CMD ["node", "dist/index.js"]
+# Use shell form to allow variable expansion
+CMD node dist/${WORKER_TYPE}.js

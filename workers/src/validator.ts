@@ -21,6 +21,11 @@ import {
   QUEUE_NAMES,
   type DraftValidateMessage,
   llmJsonRequest,
+  startHeartbeat,
+  stopHeartbeat,
+  recordSuccess,
+  recordFailure,
+  setIdle,
 } from './shared/index.js';
 import {
   VALIDATION_SYSTEM_PROMPT,
@@ -232,6 +237,9 @@ async function main(): Promise<void> {
   // Validate required environment variables
   validateEnv(['DATABASE_URL', 'RABBITMQ_URL', 'OPENAI_API_KEY']);
 
+  // Start heartbeat reporting to backend
+  startHeartbeat({ workerType: 'validator', intervalMs: 30000 });
+
   // Connect to services and initialize queues
   await initializeQueues();
   logger.info('Connected to RabbitMQ and queues initialized');
@@ -241,15 +249,21 @@ async function main(): Promise<void> {
   await sql`SELECT 1`;
   logger.info('Connected to database');
 
+  // Mark as idle while waiting for messages
+  setIdle();
+
   // Start consuming draft validations
   await consumeQueue<DraftValidateMessage>(
     QUEUE_NAMES.DRAFTS_VALIDATE,
     async (message, ack, nack) => {
       try {
         await processValidation(message);
+        recordSuccess();
         ack();
       } catch (error) {
-        logger.error({ error, draftMarketId: message.draft_market_id }, 'Failed to validate draft');
+        const err = error as Error;
+        logger.error({ error: { message: err.message, stack: err.stack, name: err.name }, draftMarketId: message.draft_market_id }, 'Failed to validate draft');
+        recordFailure(err.message);
         throw error;
       }
     }
@@ -260,6 +274,7 @@ async function main(): Promise<void> {
   // Graceful shutdown
   const shutdown = async () => {
     logger.info('Shutting down validator worker');
+    await stopHeartbeat();
     await closeQueue();
     await closeDb();
     process.exit(0);

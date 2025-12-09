@@ -22,6 +22,11 @@ import {
   type NewsRawMessage,
   type CandidateMessage,
   llmJsonRequest,
+  startHeartbeat,
+  stopHeartbeat,
+  recordSuccess,
+  recordFailure,
+  setIdle,
 } from './shared/index.js';
 import type { MarketCategory } from '@x402/shared-types';
 
@@ -277,6 +282,9 @@ async function main(): Promise<void> {
   // Validate required environment variables
   validateEnv(['DATABASE_URL', 'RABBITMQ_URL', 'OPENAI_API_KEY']);
 
+  // Start heartbeat reporting to backend
+  startHeartbeat({ workerType: 'extractor', intervalMs: 30000 });
+
   // Connect to services
   await initializeQueues();
   logger.info('Connected to RabbitMQ and queues initialized');
@@ -286,15 +294,21 @@ async function main(): Promise<void> {
   await sql`SELECT 1`;
   logger.info('Connected to database');
 
+  // Mark as idle while waiting for messages
+  setIdle();
+
   // Start consuming news items
   await consumeQueue<NewsRawMessage>(
     QUEUE_NAMES.NEWS_RAW,
     async (message, ack, nack) => {
       try {
         await processNewsItem(message);
+        recordSuccess();
         ack();
       } catch (error) {
-        logger.error({ error, newsId: message.news_id }, 'Failed to process news item');
+        const err = error as Error;
+        logger.error({ error: { message: err.message, stack: err.stack, name: err.name }, newsId: message.news_id }, 'Failed to process news item');
+        recordFailure(err.message);
         throw error;
       }
     }
@@ -305,6 +319,7 @@ async function main(): Promise<void> {
   // Graceful shutdown
   const shutdown = async () => {
     logger.info('Shutting down extractor worker');
+    await stopHeartbeat();
     await closeQueue();
     await closeDb();
     process.exit(0);

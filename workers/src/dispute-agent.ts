@@ -8,9 +8,10 @@
 import crypto from 'crypto';
 import { env } from './shared/env.js';
 import { logger } from './shared/logger.js';
-import { getDb } from './shared/db.js';
-import { consumeMessages, initializeQueues, QUEUE_NAMES } from './shared/queue.js';
+import { getDb, closeDb } from './shared/db.js';
+import { consumeMessages, initializeQueues, closeQueue, QUEUE_NAMES } from './shared/queue.js';
 import { llmJsonRequest } from './shared/llm.js';
+import { startHeartbeat, stopHeartbeat, recordSuccess, recordFailure, setIdle } from './shared/heartbeat.js';
 import {
   DISPUTE_REVIEW_SYSTEM_PROMPT,
   buildDisputeReviewPrompt,
@@ -372,8 +373,14 @@ async function processDispute(message: DisputeMessage): Promise<void> {
 async function main(): Promise<void> {
   logger.info('Starting Dispute Agent worker');
 
+  // Start heartbeat reporting to backend
+  startHeartbeat({ workerType: 'dispute-agent', intervalMs: 30000 });
+
   // Initialize queue
   await initializeQueues();
+
+  // Mark as idle while waiting for messages
+  setIdle();
 
   // Start consuming
   await consumeMessages<DisputeMessage>(
@@ -381,8 +388,11 @@ async function main(): Promise<void> {
     async (message, msg) => {
       try {
         await processDispute(message);
+        recordSuccess();
       } catch (error) {
-        logger.error({ error, disputeId: message.dispute_id }, 'Failed to process dispute');
+        const err = error as Error;
+        logger.error({ error: { message: err.message, stack: err.stack, name: err.name }, disputeId: message.dispute_id }, 'Failed to process dispute');
+        recordFailure(err.message);
         throw error; // Let the queue handler deal with retry
       }
     }
@@ -392,15 +402,16 @@ async function main(): Promise<void> {
 }
 
 // Handle graceful shutdown
-process.on('SIGINT', async () => {
-  logger.info('Received SIGINT, shutting down...');
+const shutdown = async () => {
+  logger.info('Shutting down dispute-agent worker...');
+  await stopHeartbeat();
+  await closeQueue();
+  await closeDb();
   process.exit(0);
-});
+};
 
-process.on('SIGTERM', async () => {
-  logger.info('Received SIGTERM, shutting down...');
-  process.exit(0);
-});
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
 
 // Start the worker
 main().catch((error) => {

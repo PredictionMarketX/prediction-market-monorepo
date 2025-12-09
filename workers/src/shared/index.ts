@@ -6,3 +6,4 @@ export * from './llm.js';
 export * from './auth.js';
 export * from './config.js';
 export * from './health.js';
+export * from './heartbeat.js';

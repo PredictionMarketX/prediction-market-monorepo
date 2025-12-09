@@ -28,6 +28,13 @@ export const adminPanelConfig: AdminPanelSection[] = [
         href: '/admin/ai-config',
         requireAdmin: true,
       },
+      {
+        id: 'worker-monitor',
+        title: 'Worker Monitor',
+        description: 'Monitor and enable/disable background worker processes',
+        href: '/admin/workers',
+        requireAdmin: true,
+      },
     ],
   },
   {
