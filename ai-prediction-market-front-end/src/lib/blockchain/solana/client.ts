@@ -258,6 +258,62 @@ export class SolanaAdapter implements IBlockchainAdapter {
     }
   }
 
+  // Add an address to the whitelist (admin only)
+  async addToWhitelist(creatorAddress: string): Promise<TransactionResult> {
+    if (!this.program || !this.wallet?.publicKey) {
+      return { signature: '', success: false, error: 'Wallet not connected' };
+    }
+
+    try {
+      const creatorPubkey = new PublicKey(creatorAddress);
+      const [globalConfig] = this.getConfigPDA();
+      const [whitelistPDA] = this.getWhitelistPDA(creatorPubkey);
+
+      const signature = await (this.program.methods as any)
+        .addToWhitelist(creatorPubkey)
+        .accounts({
+          globalConfig,
+          whitelist: whitelistPDA,
+          authority: this.wallet.publicKey,
+          systemProgram: SystemProgram.programId,
+        })
+        .rpc();
+
+      return { signature, success: true };
+    } catch (error: any) {
+      console.error('Failed to add to whitelist:', error);
+      return { signature: '', success: false, error: error.message || String(error) };
+    }
+  }
+
+  // Remove an address from the whitelist (admin only)
+  async removeFromWhitelist(creatorAddress: string): Promise<TransactionResult> {
+    if (!this.program || !this.wallet?.publicKey) {
+      return { signature: '', success: false, error: 'Wallet not connected' };
+    }
+
+    try {
+      const creatorPubkey = new PublicKey(creatorAddress);
+      const [globalConfig] = this.getConfigPDA();
+      const [whitelistPDA] = this.getWhitelistPDA(creatorPubkey);
+
+      const signature = await (this.program.methods as any)
+        .removeFromWhitelist(creatorPubkey)
+        .accounts({
+          globalConfig,
+          whitelist: whitelistPDA,
+          authority: this.wallet.publicKey,
+          systemProgram: SystemProgram.programId,
+        })
+        .rpc();
+
+      return { signature, success: true };
+    } catch (error: any) {
+      console.error('Failed to remove from whitelist:', error);
+      return { signature: '', success: false, error: error.message || String(error) };
+    }
+  }
+
   // Market operations (read-only)
   async getMarkets(limit = 10, offset = 0): Promise<Market[]> {
     try {

@@ -105,7 +105,6 @@ export const adminPanelConfig: AdminPanelSection[] = [
         description: 'Add or remove addresses from the market creator whitelist',
         href: '/admin/whitelist',
         requireAdmin: true,
-        comingSoon: true,
       },
       {
         id: 'transfer-authority',
