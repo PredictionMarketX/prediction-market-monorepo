@@ -5,7 +5,8 @@
  */
 
 import { Connection, Keypair, PublicKey, SystemProgram, SYSVAR_RENT_PUBKEY } from '@solana/web3.js';
-import { Program, AnchorProvider, Wallet, BN } from '@coral-xyz/anchor';
+import anchor from '@coral-xyz/anchor';
+const { Program, AnchorProvider, Wallet, BN } = anchor;
 import { TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID, getAssociatedTokenAddressSync } from '@solana/spl-token';
 import bs58 from 'bs58';
 import { env } from '../env.js';
@@ -85,10 +86,10 @@ export interface CreateMarketParams {
 
 export class SolanaClient {
   private connection: Connection;
-  private wallet: Wallet;
+  private wallet: InstanceType<typeof Wallet>;
   private keypair: Keypair;
-  private program: Program;
-  private provider: AnchorProvider;
+  private program: InstanceType<typeof Program>;
+  private provider: InstanceType<typeof AnchorProvider>;
 
   constructor() {
     this.connection = new Connection(env.SOLANA_RPC_URL, 'confirmed');
