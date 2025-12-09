@@ -4,6 +4,14 @@ import { NotFoundError } from '../utils/errors.js';
 import { logger } from '../utils/logger.js';
 import { getDb, isDatabaseConfigured } from '../db/client.js';
 
+// Default values for markets when on-chain data is unavailable
+// These are used as placeholders in the database-only fallback response
+const MARKET_DEFAULTS = {
+  B_PARAMETER: 100,
+  YES_PRICE: 0.5,
+  NO_PRICE: 0.5,
+} as const;
+
 // Database market type
 interface DbMarket {
   id: string;
@@ -65,16 +73,16 @@ export class MarketService {
       noMint: dbMarket.no_token_mint || '',
       collateralVault: '', // Derived from on-chain, not critical for listing
       status: dbMarket.status === 'active' ? 'active' : dbMarket.status === 'resolved' ? 'resolved' : 'paused',
-      bParameter: 100, // Default, could be added to DB schema
+      bParameter: MARKET_DEFAULTS.B_PARAMETER,
       // These values require on-chain data for accuracy
-      // For now, return defaults - frontend can fetch on-chain for detail view
+      // For listing view, return defaults - frontend fetches on-chain for detail view
       totalLiquidity: 0,
       poolYesReserve: 0,
       poolNoReserve: 0,
       totalLpShares: 0,
       totalPoolValue: 0,
-      yesPrice: 0.5,
-      noPrice: 0.5,
+      yesPrice: MARKET_DEFAULTS.YES_PRICE,
+      noPrice: MARKET_DEFAULTS.NO_PRICE,
       createdAt: dbMarket.published_at
         ? Math.floor(dbMarket.published_at.getTime() / 1000)
         : Math.floor(dbMarket.created_at.getTime() / 1000),

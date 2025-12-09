@@ -24,8 +24,8 @@ export async function fetchMarkets(limit = 10, offset = 0): Promise<{
         total: response.data.total,
       };
     }
-  } catch (error) {
-    console.warn('Failed to fetch markets from backend, falling back to on-chain:', error);
+  } catch {
+    // Silently fall back to on-chain if backend is unavailable
   }
 
   // Fallback to on-chain if backend fails
@@ -51,8 +51,8 @@ export async function fetchMarket(address: string): Promise<MarketWithMetadata |
         metadata: market.metadata || undefined,
       };
     }
-  } catch (error) {
-    console.warn('Failed to fetch market from backend, falling back to on-chain:', error);
+  } catch {
+    // Silently fall back to on-chain if backend is unavailable
   }
 
   // Fallback to pure on-chain

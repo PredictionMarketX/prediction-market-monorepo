@@ -65,12 +65,24 @@ async function getDraftMarket(draftMarketId: string) {
 }
 
 /**
- * Generate YES/NO token metadata URI (can be expanded with IPFS in future)
+ * Generate YES/NO token metadata URI
+ * Uses METADATA_BASE_URL env var if configured, otherwise generates a data URI
  */
 function generateMetadataUri(title: string, isYes: boolean): string {
-  // For now, return a placeholder URI - in production, upload to IPFS/Arweave
   const type = isYes ? 'YES' : 'NO';
-  return `https://api.polymarket.com/metadata/${type}/${encodeURIComponent(title)}`;
+
+  // Use configured metadata base URL if available
+  if (env.METADATA_BASE_URL) {
+    return `${env.METADATA_BASE_URL}/${type}/${encodeURIComponent(title)}`;
+  }
+
+  // Fallback: generate inline data URI with basic metadata
+  const metadata = {
+    name: `${title} - ${type}`,
+    symbol: type,
+    description: `${type} token for prediction market: ${title}`,
+  };
+  return `data:application/json,${encodeURIComponent(JSON.stringify(metadata))}`;
 }
 
 /**

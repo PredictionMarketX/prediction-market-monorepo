@@ -12,3 +12,6 @@ migrations
 app
 keys
 .claude/
+
+# Build and test output logs
+*.log
