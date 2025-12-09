@@ -37,6 +37,10 @@ x402-ploymarket/
 │       └── dispute-agent.ts            # Dispute review AI
 ├── packages/
 │   └── shared-types/                   # Shared TypeScript types
+├── scripts/                            # Deployment scripts
+│   ├── railway-setup.sh                # Create Railway services
+│   └── deploy-all.sh                   # Deploy all services
+├── Dockerfile.backend                  # Backend Docker image
 └── README.md
 ```
 
@@ -266,7 +270,35 @@ npm install -g @railway/cli
 railway login
 ```
 
-#### Step 2: Create Railway Project
+#### Quick Deploy with Scripts (Recommended)
+
+We provide automated scripts for Railway deployment:
+
+```bash
+# 1. Setup: Create all services with env vars from workers/.env
+./scripts/railway-setup.sh
+
+# 2. Deploy: Deploy all services
+./scripts/deploy-all.sh              # Sequential deployment
+./scripts/deploy-all.sh --parallel   # Parallel deployment (faster)
+./scripts/deploy-all.sh --backend-only    # Deploy backend only
+./scripts/deploy-all.sh --workers-only    # Deploy workers only
+```
+
+**What `railway-setup.sh` does:**
+- Checks for existing services (skips if already created)
+- Creates backend service
+- Creates all 8 worker services (generator, validator, publisher, resolver, scheduler, dispute-agent, crawler, extractor)
+- Sets `WORKER_TYPE` env var for each worker
+- Loads all env vars from `workers/.env` for worker services
+
+**After setup, configure in Railway dashboard:**
+1. Backend service → Settings → Set Dockerfile to `Dockerfile.backend`
+2. Each worker service → Settings → Set Dockerfile to `workers/Dockerfile`
+3. Backend service → Add any additional env vars not in workers/.env
+4. Update `API_BASE_URL` in workers to your deployed backend URL
+
+#### Step 2: Create Railway Project (Manual Alternative)
 
 ```bash
 # Navigate to the repo root
