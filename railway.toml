@@ -1,0 +1,6 @@
+# Railway config - forces Dockerfile builder for all services
+# Each service specifies its Dockerfile path via RAILWAY_DOCKERFILE_PATH env var:
+#   - backend: Dockerfile.backend
+#   - workers: workers/Dockerfile
+[build]
+builder = "DOCKERFILE"
