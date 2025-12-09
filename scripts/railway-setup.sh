@@ -3,7 +3,8 @@
 # Railway Setup Script - Creates and configures all services
 # Usage: ./scripts/railway-setup.sh
 
-set -e
+# Don't exit on error - continue setting other vars if one fails
+# set -e
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -46,6 +47,7 @@ echo ""
 # Get existing services
 echo -e "${BLUE}Checking existing services...${NC}"
 EXISTING_SERVICES=$(railway service status --all 2>/dev/null | grep -E '^\S+' | awk '{print $1}' || echo "")
+echo "Found services: $EXISTING_SERVICES"
 echo ""
 
 # Function to check if service exists
@@ -54,12 +56,21 @@ service_exists() {
   echo "$EXISTING_SERVICES" | grep -qw "$service"
 }
 
-# Set variable on a service
+# Set variable on a service (with visible output)
 set_service_var() {
   local service=$1
   local key=$2
   local value=$3
-  railway variables set "$key=$value" --service "$service" 2>/dev/null
+  echo -n "  Setting $key... "
+  # Small delay to avoid Railway API rate limiting
+  sleep 0.5
+  if railway variables --set "$key=$value" --service "$service" > /dev/null 2>&1; then
+    echo -e "${GREEN}OK${NC}"
+    return 0
+  else
+    echo -e "${RED}FAILED${NC}"
+    return 1
+  fi
 }
 
 # Update existing service with all env vars
@@ -68,7 +79,7 @@ update_service_vars() {
   local is_worker=$2
   local worker_type=$3
 
-  echo -e "${YELLOW}[UPDATE]${NC} ${service} - setting variables..."
+  echo -e "${YELLOW}[UPDATE]${NC} ${service}"
 
   # Set Dockerfile path
   if [ "$is_worker" = "true" ]; then
@@ -77,6 +88,7 @@ update_service_vars() {
 
     # Load env vars from workers/.env
     if [ -f "$WORKERS_ENV_FILE" ]; then
+      echo "  Loading vars from workers/.env..."
       while IFS= read -r line || [ -n "$line" ]; do
         [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
         if [[ "$line" =~ ^([A-Za-z_][A-Za-z0-9_]*)=(.*)$ ]]; then
@@ -90,10 +102,11 @@ update_service_vars() {
     set_service_var "$service" "RAILWAY_DOCKERFILE_PATH" "Dockerfile.backend"
   fi
 
-  echo -e "${GREEN}[OK]${NC} ${service} variables updated"
+  echo -e "  ${GREEN}Done${NC}"
+  echo ""
 }
 
-# Create service with env vars
+# Create service
 create_service() {
   local service=$1
   local is_worker=$2
@@ -101,12 +114,11 @@ create_service() {
 
   echo -e "${YELLOW}[CREATE]${NC} ${service}..."
 
-  # Create the service first (empty)
-  if railway add --service "$service" 2>/dev/null; then
-    # Then update its variables
+  if railway add --service "$service"; then
+    echo -e "  ${GREEN}Service created${NC}"
     update_service_vars "$service" "$is_worker" "$worker_type"
   else
-    echo -e "${RED}[FAIL]${NC} ${service} - could not create"
+    echo -e "  ${RED}Failed to create service${NC}"
     return 1
   fi
 }
@@ -145,6 +157,4 @@ done
 echo ""
 echo -e "${GREEN}=== Setup complete ===${NC}"
 echo ""
-echo "All services have RAILWAY_DOCKERFILE_PATH configured."
-echo ""
-echo "To deploy: ./scripts/deploy-all.sh --parallel"
+echo "Now deploy with: ./scripts/deploy-all.sh --parallel"
