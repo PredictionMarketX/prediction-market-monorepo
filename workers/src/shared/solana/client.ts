@@ -169,6 +169,20 @@ export class SolanaClient {
   }
 
   /**
+   * Check if the publisher wallet is whitelisted
+   */
+  async isWhitelisted(): Promise<boolean> {
+    try {
+      const [whitelistPDA] = this.getWhitelistPDA(this.keypair.publicKey);
+      const accountInfo = await this.connection.getAccountInfo(whitelistPDA);
+      return accountInfo !== null;
+    } catch (error) {
+      logger.error({ error }, 'Failed to check whitelist status');
+      return false;
+    }
+  }
+
+  /**
    * Create a market on-chain
    *
    * This involves two transactions:
@@ -177,6 +191,19 @@ export class SolanaClient {
    */
   async createMarket(params: CreateMarketParams): Promise<CreateMarketResult> {
     logger.info({ displayName: params.displayName }, 'Creating market on-chain');
+
+    // Check if wallet is whitelisted before proceeding
+    const whitelisted = await this.isWhitelisted();
+    if (!whitelisted) {
+      const walletAddress = this.keypair.publicKey.toBase58();
+      logger.error(
+        { walletAddress },
+        'Publisher wallet is NOT whitelisted. Please whitelist this address before creating markets.'
+      );
+      throw new Error(`Publisher wallet ${walletAddress} is not whitelisted. Add it to the whitelist via the admin panel.`);
+    }
+
+    logger.info('Publisher wallet is whitelisted, proceeding with market creation');
 
     const [globalConfig] = this.getGlobalConfigPDA();
     const [globalVault] = this.getGlobalVaultPDA();

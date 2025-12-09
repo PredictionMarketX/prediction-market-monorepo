@@ -259,6 +259,24 @@ async function main(): Promise<void> {
     process.env.DRY_RUN = 'true';
   } else {
     logger.info('PUBLISHER_PRIVATE_KEY validated, running in LIVE mode');
+
+    // Check if wallet is whitelisted (only in LIVE mode)
+    try {
+      const solanaClient = getSolanaClient();
+      const isWhitelisted = await solanaClient.isWhitelisted();
+      const walletAddress = solanaClient.getPublisherAddress();
+
+      if (isWhitelisted) {
+        logger.info({ walletAddress }, 'Publisher wallet is WHITELISTED - ready to create markets');
+      } else {
+        logger.warn(
+          { walletAddress },
+          'Publisher wallet is NOT WHITELISTED! Markets will fail to create. Please whitelist this address via the admin panel.'
+        );
+      }
+    } catch (error) {
+      logger.error({ error }, 'Failed to check whitelist status on startup');
+    }
   }
 
   // Connect to services
