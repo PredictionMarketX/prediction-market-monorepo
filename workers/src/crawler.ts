@@ -268,7 +268,6 @@ export async function ingestNewsItem(item: {
     content: item.content,
     publishedAt,
     contentHash,
-    categoryHint: item.categoryHint,
   });
 
   // Publish to queue
