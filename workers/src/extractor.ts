@@ -192,10 +192,12 @@ async function saveCandidate(candidate: {
 
 /**
  * Update news item status
+ * Valid statuses: 'pending', 'processed', 'error'
+ * (matches database constraint valid_news_status)
  */
 async function updateNewsStatus(
   newsId: string,
-  status: 'extracted' | 'skipped' | 'forbidden'
+  status: 'pending' | 'processed' | 'error'
 ): Promise<void> {
   const sql = getDb();
   await sql`
@@ -216,7 +218,7 @@ async function processNewsItem(message: NewsRawMessage): Promise<void> {
   // Check for forbidden topics
   if (containsForbiddenTopic(fullText)) {
     logger.info({ newsId: message.news_id }, 'News contains forbidden topic, skipping');
-    await updateNewsStatus(message.news_id, 'forbidden');
+    await updateNewsStatus(message.news_id, 'processed');
     return;
   }
 
@@ -231,7 +233,7 @@ async function processNewsItem(message: NewsRawMessage): Promise<void> {
 
     if (!llmResult || !llmResult.is_market_worthy) {
       logger.info({ newsId: message.news_id }, 'Not market worthy, skipping');
-      await updateNewsStatus(message.news_id, 'skipped');
+      await updateNewsStatus(message.news_id, 'processed');
       return;
     }
 
@@ -265,7 +267,7 @@ async function processNewsItem(message: NewsRawMessage): Promise<void> {
   await publishCandidate(candidateMessage);
 
   // Update news status
-  await updateNewsStatus(message.news_id, 'extracted');
+  await updateNewsStatus(message.news_id, 'processed');
 
   logger.info(
     { newsId: message.news_id, candidateId, eventType, category },
