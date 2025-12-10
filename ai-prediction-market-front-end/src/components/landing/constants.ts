@@ -1,9 +1,54 @@
 // Landing page configuration constants
 
+// Shared UI style constants - used across components for consistency
+export const UI_STYLES = {
+  // Card styles
+  card: {
+    base: 'bg-gray-900/50 rounded-2xl border border-purple-900/30',
+    hover: 'transition-all duration-300 hover:shadow-2xl hover:shadow-purple-500/20 hover:border-purple-500/50',
+    gradient: 'bg-gradient-to-br from-purple-900/10 to-transparent',
+    padding: {
+      sm: 'p-5',
+      md: 'p-6',
+    },
+  },
+  // Status badge colors for markets
+  statusColors: {
+    active: 'bg-green-500/20 text-green-400',
+    resolved: 'bg-gray-800 text-gray-200',
+    paused: 'bg-yellow-500/20 text-yellow-400',
+  },
+  // Button variants
+  button: {
+    primary: 'bg-purple-600 hover:bg-purple-700',
+    outline: 'border-gray-700 text-white hover:bg-gray-800',
+  },
+  // Skeleton loading
+  skeleton: {
+    base: 'bg-gray-700/50 animate-pulse',
+    rounded: 'rounded',
+    roundedFull: 'rounded-full',
+  },
+} as const;
+
+// Helper to get status color class
+export function getStatusColorClass(status: string): string {
+  const statusKey = status.toLowerCase() as keyof typeof UI_STYLES.statusColors;
+  return UI_STYLES.statusColors[statusKey] || UI_STYLES.statusColors.active;
+}
+
+// Helper to build card class string
+export function buildCardClasses(options?: { hover?: boolean; padding?: 'sm' | 'md' }): string {
+  const { hover = true, padding = 'md' } = options || {};
+  const classes: string[] = [UI_STYLES.card.base, UI_STYLES.card.padding[padding]];
+  if (hover) classes.push(UI_STYLES.card.hover);
+  return classes.join(' ');
+}
+
 export const LANDING_CONFIG = {
   // Brand
   brand: {
-    name: "PredictX",
+    name: "PloyMarket",
     tagline: "Decentralized Prediction Markets on Solana",
   },
 
@@ -11,75 +56,73 @@ export const LANDING_CONFIG = {
   hero: {
     badge: "AI-Powered Market Generation",
     title: {
-      line1: "Decentralized",
-      highlight1: "Prediction",
-      highlight2: "Markets",
-      line2: "on Solana",
+      line1: "Trade the Future",
+      highlight1: "Smarter",
+      highlight2: "Faster",
+      line2: "with AI",
     },
     description:
-      "Trade on future events with multi-chain payments. Powered by AI market generation and secured by blockchain technology.",
-    primaryCta: "Start Trading",
-    secondaryCta: "View Markets",
+      "PloyMarket is a decentralized prediction market platform on Solana that uses AI to create and resolve markets.",
+    primaryCta: "Explore Markets",
+    secondaryCta: "Propose a Market",
   },
 
   // Features
   features: [
     {
       id: "solana",
-      title: "Solana Blockchain",
-      description:
-        "Lightning-fast transactions with minimal fees on the Solana network for optimal trading experience.",
+      title: "Solana Speed",
+      description: "Experience lightning-fast trades and ultra-low fees, powered by the Solana blockchain.",
       iconType: "solana" as const,
     },
     {
-      id: "x402",
-      title: "Multi-Chain",
-      description: "Seamless cross-chain payments and interactions",
-      iconType: "x402" as const,
+      id: "ai",
+      title: "AI-Powered",
+      description: "Our advanced AI creates, manages, and resolves markets, ensuring fairness and efficiency.",
+      iconType: "ai" as const,
     },
     {
-      id: "ai",
-      title: "AI Market Generation",
-      description:
-        "Intelligent algorithms create and curate prediction markets based on real-world events and trends.",
-      iconType: "ai" as const,
+      id: "liquidity",
+      title: "Deep Liquidity",
+      description: "Trade with confidence thanks to our robust liquidity pools and automated market makers.",
+      iconType: "liquidity" as const,
     },
   ],
 
-  // Stats (placeholder values - should be fetched from API in production)
+  // Stats
   stats: [
     {
       id: "volume",
-      value: "$47.2M",
+      value: "1.2M+",
       label: "Total Volume",
-      colorClass: "text-purple-400",
+      iconType: "volume" as const,
     },
     {
       id: "traders",
-      value: "12,847",
+      value: "500+",
       label: "Active Traders",
-      colorClass: "text-blue-400",
+      iconType: "users" as const,
     },
     {
       id: "markets",
-      value: "234",
+      value: "100+",
       label: "Active Markets",
-      colorClass: "text-white",
+      iconType: "markets" as const,
     },
     {
       id: "uptime",
-      value: "98.7%",
+      value: "99.9%",
       label: "Uptime",
-      colorClass: "text-green-400",
+      iconType: "uptime" as const,
     },
   ],
 
   // CTA section
   cta: {
-    title: "Ready to Start Predicting?",
+    title: "Join the Future of Prediction Markets",
     description:
-      "Join thousands of traders making predictions on real-world events with cutting-edge blockchain technology.",
-    primaryButton: "Connect Wallet & Trade",
+      "Connect your wallet and start trading on a wide range of markets, or propose your own.",
+    primaryButton: "Get Started",
     secondaryButton: "Learn More",
   },
 
@@ -88,15 +131,13 @@ export const LANDING_CONFIG = {
     sections: {
       platform: [
         { label: "Markets", href: "/markets" },
-        { label: "Analytics", href: "/markets" },
-        { label: "Leaderboard", href: "/markets" },
-        { label: "API", href: "/markets" },
+        { label: "Propose", href: "/propose" },
+        { label: "Portfolio", href: "/portfolio" },
       ],
       support: [
         { label: "Documentation", href: "#" },
         { label: "Help Center", href: "#" },
         { label: "Contact", href: "#" },
-        { label: "Bug Report", href: "#" },
       ],
     },
     social: {
@@ -207,9 +248,26 @@ export const ANIMATION_CONFIG = {
     innerRadius: 0.5,
     opacity: 0.3,
   },
-} as const;
 
-// Type exports
-export type Feature = (typeof LANDING_CONFIG.features)[number];
-export type Stat = (typeof LANDING_CONFIG.stats)[number];
-export type NavLink = (typeof NAV_LINKS)[number];
+  // Circuit path boundaries
+  circuitBoundary: {
+    yPadding: 50, // Padding from top/bottom canvas edges
+  },
+
+  // Binary stream positioning
+  binaryStream: {
+    heightOffset: 150, // Offset for stream wrapping calculation
+    startOffset: 50, // Start position offset
+  },
+
+  // Node glow effects
+  nodeGlow: {
+    mouseProximity: 120, // Distance for glow effect
+    multiplierBoost: 1.5, // Glow intensity multiplier
+  },
+
+  // Connection distance adjustment
+  connectionAdjustment: {
+    mouseDistanceOffset: 40, // Offset from extended connection distance
+  },
+} as const;

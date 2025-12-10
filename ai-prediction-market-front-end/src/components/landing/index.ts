@@ -6,5 +6,4 @@ export { StatsSection } from './StatsSection';
 export { CTASection } from './CTASection';
 export { Footer } from './Footer';
 export { SectionHeader } from './SectionHeader';
-export { LANDING_CONFIG, NAV_LINKS, ANIMATION_CONFIG } from './constants';
-export type { Feature, Stat, NavLink } from './constants';
+export { LANDING_CONFIG, NAV_LINKS, ANIMATION_CONFIG, UI_STYLES, getStatusColorClass, buildCardClasses } from './constants';

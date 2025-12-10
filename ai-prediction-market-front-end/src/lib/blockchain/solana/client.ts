@@ -33,15 +33,23 @@ import type {
   UserLPPosition,
 } from '@/types';
 
+// Import modular components
+import { USDC_MULTIPLIER, COMPUTE_BUDGET, TRANSACTION_DEFAULTS } from './constants';
+import {
+  MPL_TOKEN_METADATA_PROGRAM_ID,
+  getGlobalPDA,
+  getConfigPDA,
+  getWhitelistPDA,
+  getMarketPDAFromMints,
+  getMetadataPDA,
+  getUserInfoPDA,
+  getLPPositionPDA,
+  getMarketUsdcVaultPDA,
+} from './pda';
+import { formatMarketAccount, calculateEarlyExitPenalty } from './utils';
+
 // Import IDL
 import idl from './idl/prediction_market.json';
-
-// Metaplex Token Metadata Program ID
-const MPL_TOKEN_METADATA_PROGRAM_ID = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
-
-// USDC decimals constant
-const USDC_DECIMALS = 6;
-const USDC_MULTIPLIER = 10 ** USDC_DECIMALS;
 
 // Dynamic config that can be updated from backend
 interface DynamicConfig {
@@ -140,70 +148,37 @@ export class SolanaAdapter implements IBlockchainAdapter {
     );
   }
 
-  // Helper to get PDAs
+  // Helper methods that delegate to imported PDA functions
   private getGlobalPDA(): [PublicKey, number] {
-    return PublicKey.findProgramAddressSync(
-      [Buffer.from(solanaConfig.seeds.GLOBAL)],
-      new PublicKey(this.dynamicConfig.programId)
-    );
+    return getGlobalPDA(this.dynamicConfig.programId);
   }
 
   private getConfigPDA(): [PublicKey, number] {
-    return PublicKey.findProgramAddressSync(
-      [Buffer.from(solanaConfig.seeds.CONFIG)],
-      new PublicKey(this.dynamicConfig.programId)
-    );
+    return getConfigPDA(this.dynamicConfig.programId);
   }
 
   private getWhitelistPDA(creatorPubkey: PublicKey): [PublicKey, number] {
-    return PublicKey.findProgramAddressSync(
-      [Buffer.from(solanaConfig.seeds.WHITELIST), creatorPubkey.toBytes()],
-      new PublicKey(this.dynamicConfig.programId)
-    );
+    return getWhitelistPDA(creatorPubkey, this.dynamicConfig.programId);
   }
 
-  // Get market PDA using YES and NO token mints as seeds
   private getMarketPDAFromMints(yesToken: PublicKey, noToken: PublicKey): [PublicKey, number] {
-    return PublicKey.findProgramAddressSync(
-      [Buffer.from(solanaConfig.seeds.MARKET), yesToken.toBytes(), noToken.toBytes()],
-      new PublicKey(this.dynamicConfig.programId)
-    );
+    return getMarketPDAFromMints(yesToken, noToken, this.dynamicConfig.programId);
   }
 
-  // Get Metaplex metadata PDA for a token mint
   private getMetadataPDA(mint: PublicKey): [PublicKey, number] {
-    return PublicKey.findProgramAddressSync(
-      [
-        Buffer.from('metadata'),
-        MPL_TOKEN_METADATA_PROGRAM_ID.toBytes(),
-        mint.toBytes(),
-      ],
-      MPL_TOKEN_METADATA_PROGRAM_ID
-    );
+    return getMetadataPDA(mint);
   }
 
-  // Get User Info PDA (for tracking user's trading stats in a market)
   private getUserInfoPDA(user: PublicKey, market: PublicKey): [PublicKey, number] {
-    return PublicKey.findProgramAddressSync(
-      [Buffer.from(solanaConfig.seeds.USERINFO), user.toBytes(), market.toBytes()],
-      new PublicKey(this.dynamicConfig.programId)
-    );
+    return getUserInfoPDA(user, market, this.dynamicConfig.programId);
   }
 
-  // Get LP Position PDA (for tracking user's liquidity position)
   private getLPPositionPDA(market: PublicKey, user: PublicKey): [PublicKey, number] {
-    return PublicKey.findProgramAddressSync(
-      [Buffer.from(solanaConfig.seeds.LP_POSITION), market.toBytes(), user.toBytes()],
-      new PublicKey(this.dynamicConfig.programId)
-    );
+    return getLPPositionPDA(market, user, this.dynamicConfig.programId);
   }
 
-  // Get Market USDC Vault PDA
   private getMarketUsdcVaultPDA(market: PublicKey): [PublicKey, number] {
-    return PublicKey.findProgramAddressSync(
-      [Buffer.from(solanaConfig.seeds.MARKET_USDC_VAULT), market.toBytes()],
-      new PublicKey(this.dynamicConfig.programId)
-    );
+    return getMarketUsdcVaultPDA(market, this.dynamicConfig.programId);
   }
 
   // Get config account data (for team wallet, USDC mint, etc.)
@@ -423,14 +398,7 @@ export class SolanaAdapter implements IBlockchainAdapter {
         : 0;
 
       // Calculate early exit penalty based on holding period
-      let earlyExitPenaltyPercent = 0;
-      if (holdingDays < 7) {
-        earlyExitPenaltyPercent = 3.0; // 300 bps
-      } else if (holdingDays < 14) {
-        earlyExitPenaltyPercent = 1.5; // 150 bps
-      } else if (holdingDays < 30) {
-        earlyExitPenaltyPercent = 0.5; // 50 bps
-      }
+      const earlyExitPenaltyPercent = calculateEarlyExitPenalty(holdingDays);
 
       return {
         marketAddress,
@@ -855,7 +823,7 @@ export class SolanaAdapter implements IBlockchainAdapter {
       // Contract defines: 0=NO, 1=YES
       const tokenType = params.tokenType === 'yes' ? 1 : 0;
       const minOutput = new BN(0); // Can be calculated with slippage
-      const deadline = new BN(Math.floor(Date.now() / 1000) + 300); // 5 minutes
+      const deadline = new BN(Math.floor(Date.now() / 1000) + TRANSACTION_DEFAULTS.DEADLINE_SECONDS);
 
       // Use snake_case field names to match IDL exactly
       const swapData = coder.instruction.encode('swap', {
@@ -874,8 +842,8 @@ export class SolanaAdapter implements IBlockchainAdapter {
 
       // Build transaction with compute budget
       const tx = new Transaction()
-        .add(ComputeBudgetProgram.setComputeUnitLimit({ units: 1_400_000 }))
-        .add(ComputeBudgetProgram.requestHeapFrame({ bytes: 256 * 1024 }))
+        .add(ComputeBudgetProgram.setComputeUnitLimit({ units: COMPUTE_BUDGET.SWAP_UNITS }))
+        .add(ComputeBudgetProgram.requestHeapFrame({ bytes: COMPUTE_BUDGET.HEAP_BYTES }))
         .add(swapIx);
 
       // Get recent blockhash for simulation
@@ -1294,7 +1262,7 @@ export class SolanaAdapter implements IBlockchainAdapter {
 
       // Build transaction with compute budget
       const tx = new Transaction()
-        .add(ComputeBudgetProgram.setComputeUnitLimit({ units: 600_000 }))
+        .add(ComputeBudgetProgram.setComputeUnitLimit({ units: COMPUTE_BUDGET.DEFAULT_UNITS }))
         .add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1 }))
         .add(withdrawIx);
 
@@ -1384,6 +1352,7 @@ export class SolanaAdapter implements IBlockchainAdapter {
         if (yesBalance > 0 || noBalance > 0 || lpBalance > 0) {
           positions.push({
             marketAddress,
+            marketName: account.displayName || account.name || '',
             yesBalance,
             noBalance,
             lpBalance,
@@ -1399,88 +1368,9 @@ export class SolanaAdapter implements IBlockchainAdapter {
     }
   }
 
-  // Helper to format market data
+  // Helper to format market data - delegates to utility function
   private formatMarket(accountData: { publicKey: PublicKey; account: any }): Market {
-    const { publicKey, account } = accountData;
-
-    // Contract stores createdAt as Unix timestamp in SECONDS, convert to milliseconds
-    const createdAtSeconds = account.createdAt?.toNumber() || 0;
-    const createdAtMs = createdAtSeconds > 0 ? createdAtSeconds * 1000 : Date.now();
-
-    // Get prices first (needed for total pool value calculation)
-    const yesPrice = this.calculatePrice(account, 'yes');
-    const noPrice = this.calculatePrice(account, 'no');
-
-    // Get pool reserves (in USDC decimals, divide by 1e6)
-    const poolCollateralReserve = ((account.poolCollateralReserve || account.totalLiquidity)?.toNumber() || 0) / 1e6;
-    const poolYesReserve = ((account.poolYesReserve)?.toNumber() || 0) / 1e6;
-    const poolNoReserve = ((account.poolNoReserve)?.toNumber() || 0) / 1e6;
-    const totalLpShares = ((account.totalLpShares)?.toNumber() || 0) / 1e6;
-
-    // Calculate total pool value: USDC + (YES tokens * YES price) + (NO tokens * NO price)
-    // This represents the total economic value of the pool
-    const yesValue = poolYesReserve * yesPrice;
-    const noValue = poolNoReserve * noPrice;
-    const totalPoolValue = poolCollateralReserve + yesValue + noValue;
-
-    return {
-      address: publicKey.toBase58(),
-      // Contract uses 'displayName' for the market name/question
-      name: account.displayName || account.name || '',
-      metadataUri: account.metadataUri || account.yesUri || '',
-      creator: account.creator?.toBase58() || '',
-      // Contract uses yesTokenMint/noTokenMint
-      yesMint: (account.yesTokenMint || account.yesMint)?.toBase58() || '',
-      noMint: (account.noTokenMint || account.noMint)?.toBase58() || '',
-      collateralVault: account.collateralVault?.toBase58() || '',
-      status: this.getMarketStatus(account),
-      // Contract uses lmsrB for b parameter
-      bParameter: (account.lmsrB || account.bParameter)?.toNumber() || 500,
-      // Liquidity breakdown
-      totalLiquidity: poolCollateralReserve,
-      poolYesReserve,
-      poolNoReserve,
-      totalLpShares,
-      totalPoolValue,
-      // Prices
-      yesPrice,
-      noPrice,
-      createdAt: createdAtMs,
-    };
-  }
-
-  private getMarketStatus(account: any): 'active' | 'paused' | 'resolved' {
-    // Check various status indicators from the contract
-    if (account.isCompleted) return 'resolved';
-    if (account.marketPaused) return 'paused';
-    if (account.status?.active) return 'active';
-    if (account.status?.paused) return 'paused';
-    if (account.status?.resolved) return 'resolved';
-    return 'active';
-  }
-
-  private calculatePrice(account: any, tokenType: 'yes' | 'no'): number {
-    // Contract stores values with 6 decimal places (like USDC)
-    // b and q values need to be in the same scale for the formula to work
-    const rawB = (account.lmsrB || account.lmsr_b || account.bParameter)?.toNumber() || 500000000;
-    const rawQYes = (account.lmsrQYes || account.lmsr_q_yes || account.qYes)?.toNumber() || 0;
-    const rawQNo = (account.lmsrQNo || account.lmsr_q_no || account.qNo)?.toNumber() || 0;
-
-    // Scale all values consistently (divide by 1e6)
-    const b = rawB / 1e6;
-    const qYes = rawQYes / 1e6;
-    const qNo = rawQNo / 1e6;
-
-    // LMSR price formula: price = exp(q/b) / sum(exp(qi/b))
-    const expYes = Math.exp(qYes / b);
-    const expNo = Math.exp(qNo / b);
-    const total = expYes + expNo;
-
-    if (tokenType === 'yes') {
-      return total > 0 ? expYes / total : 0.5;
-    } else {
-      return total > 0 ? expNo / total : 0.5;
-    }
+    return formatMarketAccount(accountData.publicKey, accountData.account);
   }
 }
 

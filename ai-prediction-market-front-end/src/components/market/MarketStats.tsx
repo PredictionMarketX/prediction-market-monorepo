@@ -9,9 +9,15 @@ interface MarketStatsProps {
 }
 
 export function MarketStats({ market }: MarketStatsProps) {
+  // Safely access pool values with defaults
+  const poolYesReserve = market.poolYesReserve ?? 0;
+  const poolNoReserve = market.poolNoReserve ?? 0;
+  const totalLpShares = market.totalLpShares ?? 0;
+  const totalPoolValue = market.totalPoolValue ?? market.totalLiquidity ?? 0;
+
   // Calculate the value of YES and NO tokens in the pool
-  const yesValue = market.poolYesReserve * market.yesPrice;
-  const noValue = market.poolNoReserve * market.noPrice;
+  const yesValue = poolYesReserve * market.yesPrice;
+  const noValue = poolNoReserve * market.noPrice;
 
   return (
     <Card variant="bordered">
@@ -47,7 +53,7 @@ export function MarketStats({ market }: MarketStatsProps) {
                 Total Pool Value
               </span>
               <span className="text-lg font-bold text-gray-900 dark:text-white">
-                {formatCurrency(market.totalPoolValue)}
+                {formatCurrency(totalPoolValue)}
               </span>
             </div>
 
@@ -65,7 +71,7 @@ export function MarketStats({ market }: MarketStatsProps) {
                   <div
                     className="h-full bg-blue-500 rounded-full"
                     style={{
-                      width: `${market.totalPoolValue > 0 ? (market.totalLiquidity / market.totalPoolValue) * 100 : 0}%`,
+                      width: `${totalPoolValue > 0 ? (market.totalLiquidity / totalPoolValue) * 100 : 0}%`,
                     }}
                   />
                 </div>
@@ -75,7 +81,7 @@ export function MarketStats({ market }: MarketStatsProps) {
               <div>
                 <div className="flex justify-between text-xs mb-1">
                   <span className="text-gray-500 dark:text-gray-400">
-                    YES Tokens ({market.poolYesReserve.toFixed(2)} @ {formatPercent(market.yesPrice)})
+                    YES Tokens ({poolYesReserve.toFixed(2)} @ {formatPercent(market.yesPrice)})
                   </span>
                   <span className="text-green-600 dark:text-green-400">
                     {formatCurrency(yesValue)}
@@ -85,7 +91,7 @@ export function MarketStats({ market }: MarketStatsProps) {
                   <div
                     className="h-full bg-green-500 rounded-full"
                     style={{
-                      width: `${market.totalPoolValue > 0 ? (yesValue / market.totalPoolValue) * 100 : 0}%`,
+                      width: `${totalPoolValue > 0 ? (yesValue / totalPoolValue) * 100 : 0}%`,
                     }}
                   />
                 </div>
@@ -95,7 +101,7 @@ export function MarketStats({ market }: MarketStatsProps) {
               <div>
                 <div className="flex justify-between text-xs mb-1">
                   <span className="text-gray-500 dark:text-gray-400">
-                    NO Tokens ({market.poolNoReserve.toFixed(2)} @ {formatPercent(market.noPrice)})
+                    NO Tokens ({poolNoReserve.toFixed(2)} @ {formatPercent(market.noPrice)})
                   </span>
                   <span className="text-red-600 dark:text-red-400">
                     {formatCurrency(noValue)}
@@ -105,7 +111,7 @@ export function MarketStats({ market }: MarketStatsProps) {
                   <div
                     className="h-full bg-red-500 rounded-full"
                     style={{
-                      width: `${market.totalPoolValue > 0 ? (noValue / market.totalPoolValue) * 100 : 0}%`,
+                      width: `${totalPoolValue > 0 ? (noValue / totalPoolValue) * 100 : 0}%`,
                     }}
                   />
                 </div>
@@ -117,7 +123,7 @@ export function MarketStats({ market }: MarketStatsProps) {
               <div className="flex justify-between text-xs">
                 <span className="text-gray-500 dark:text-gray-400">Total LP Shares</span>
                 <span className="text-gray-700 dark:text-gray-300 font-mono">
-                  {market.totalLpShares.toFixed(2)}
+                  {totalLpShares.toFixed(2)}
                 </span>
               </div>
             </div>

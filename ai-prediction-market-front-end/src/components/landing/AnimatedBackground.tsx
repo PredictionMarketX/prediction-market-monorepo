@@ -149,7 +149,8 @@ function createCircuitPaths(canvasWidth: number, canvasHeight: number): CircuitP
       x += randomRange(segmentLength.min, segmentLength.max);
       if (Math.random() > 0.5) {
         y += (Math.random() - 0.5) * yVariation;
-        y = Math.max(50, Math.min(canvasHeight - 50, y));
+        const yPad = config.circuitBoundary.yPadding;
+        y = Math.max(yPad, Math.min(canvasHeight - yPad, y));
       }
     }
 
@@ -271,7 +272,7 @@ export function AnimatedBackground() {
       ctx.font = `${bsConfig.fontSize}px monospace`;
       binaryStreams.forEach((stream) => {
         stream.chars.forEach((char, i) => {
-          const y = (time * stream.speed * 100 + i * 16) % (canvas.height + 150) - 50;
+          const y = (time * stream.speed * 100 + i * 16) % (canvas.height + config.binaryStream.heightOffset) - config.binaryStream.startOffset;
           const fade = i === 0 ? 1 : Math.max(0.3, 1 - i / stream.chars.length);
           ctx.fillStyle = `${colors.purple.base} ${stream.opacity * fade})`;
           ctx.fillText(char, stream.x, y);
@@ -408,7 +409,7 @@ export function AnimatedBackground() {
             const midX = (node.x + other.x) / 2;
             const midY = (node.y + other.y) / 2;
             const mouseDist = Math.sqrt((mouse.x - midX) ** 2 + (mouse.y - midY) ** 2);
-            if (mouseDist < mouseConfig.extendedConnectionDistance - 40) {
+            if (mouseDist < mouseConfig.extendedConnectionDistance - config.connectionAdjustment.mouseDistanceOffset) {
               maxDist = mouseConfig.extendedConnectionDistance;
               opacityBoost = mouseConfig.connectionBoost;
             }
@@ -439,7 +440,8 @@ export function AnimatedBackground() {
         let glowMultiplier = 1;
         if (mouse.active) {
           const mouseDist = Math.sqrt((mouse.x - node.x) ** 2 + (mouse.y - node.y) ** 2);
-          if (mouseDist < 120) glowMultiplier = 1 + (1 - mouseDist / 120) * 1.5;
+          const glowProximity = config.nodeGlow.mouseProximity;
+          if (mouseDist < glowProximity) glowMultiplier = 1 + (1 - mouseDist / glowProximity) * config.nodeGlow.multiplierBoost;
         }
 
         const color = nodeColors[node.type];

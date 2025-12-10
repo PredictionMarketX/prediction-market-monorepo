@@ -1,21 +1,21 @@
-# X402 Polymarket
+# PredictionX
 
-A decentralized prediction market platform built on Solana, featuring multi-chain payment support through the X402 protocol and AI-powered market generation.
+A decentralized prediction market platform built on Solana with AI-powered market generation and X402 payment integration. Create, trade, and resolve binary outcome markets with automated liquidity and transparent, on-chain settlement.
 
 ## Features
 
-- **Prediction Markets**: Create and trade on binary outcome markets using YES/NO tokens
-- **Multi-Chain Payments**: Support for both EVM (Base Sepolia) and Solana (Devnet) via X402 protocol
-- **Single-Sided Liquidity**: Provide liquidity using only USDC - the contract automatically mints YES/NO tokens
-- **LMSR Pricing**: Logarithmic Market Scoring Rule for dynamic market pricing
-- **Real-Time Trading**: Buy and sell prediction tokens with instant settlement
-- **AI Market Generation**: Automated market creation from news and user proposals
-- **Deterministic Resolution**: Rule-based market resolution with dispute handling
+- **Prediction Markets**: Create and trade binary outcome markets using YES/NO tokens with real-time pricing
+- **AI Market Generation**: Automated market creation pipeline - crawls news, generates questions via LLM, validates quality, and publishes on-chain
+- **LMSR Pricing**: Logarithmic Market Scoring Rule provides dynamic, liquidity-sensitive pricing with bounded loss for market makers
+- **Single-Sided Liquidity**: Provide liquidity using only USDC - the smart contract automatically mints proportional YES/NO tokens
+- **X402 Payments**: Meta-transaction support via X402 protocol enables gasless trading and cross-chain payment flexibility
+- **Deterministic Resolution**: Rule-based market resolution with evidence hashing, 24-hour dispute window, and AI-assisted dispute review
+- **Multi-Chain Ready**: Architecture designed for expansion beyond Solana to EVM chains
 
 ## Project Structure
 
 ```
-x402-ploymarket/
+predictionx/
 ├── contract/                           # Solana smart contract (Anchor)
 │   └── programs/prediction-market/
 ├── ai-prediction-market-front-end/     # Next.js frontend
@@ -487,7 +487,7 @@ railway logs --service worker-generator
 After setup, your Railway project should have:
 
 ```
-Railway Project: x402-polymarket
+Railway Project: predictionx
 ├── backend              (prediction-market-back-end/Dockerfile)
 ├── worker-generator     (workers/Dockerfile, WORKER_TYPE=generator)
 ├── worker-validator     (workers/Dockerfile, WORKER_TYPE=validator)

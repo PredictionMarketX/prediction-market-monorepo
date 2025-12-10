@@ -9,20 +9,30 @@ export function CTASection() {
 
   return (
     <section className="py-16">
-      <div className="bg-gradient-to-r from-gray-900 to-gray-800 rounded-3xl p-12 text-center border border-gray-800">
-        <h2 className="text-3xl lg:text-4xl font-bold text-white mb-4">{cta.title}</h2>
-        <p className="text-gray-400 mb-8 max-w-2xl mx-auto">{cta.description}</p>
-        <div className="flex flex-wrap justify-center gap-4">
-          <Link href="/markets">
-            <Button size="lg" className="bg-purple-600 hover:bg-purple-700">
-              {cta.primaryButton}
-            </Button>
-          </Link>
-          <Link href="/markets">
-            <Button variant="outline" size="lg" className="border-gray-600 text-white hover:bg-gray-700">
-              {cta.secondaryButton}
-            </Button>
-          </Link>
+      <div className="relative bg-gray-900/50 rounded-3xl p-12 text-center overflow-hidden border border-purple-900/30">
+        <div className="absolute inset-0 bg-gradient-to-br from-purple-900/20 to-transparent" />
+        <div className="relative z-10">
+          <h2 className="text-3xl lg:text-4xl font-bold text-white mb-4">{cta.title}</h2>
+          <p className="text-gray-400 mb-8 max-w-2xl mx-auto">{cta.description}</p>
+          <div className="flex flex-wrap justify-center gap-4">
+            <Link href="/markets">
+              <Button
+                size="lg"
+                className="bg-purple-600 hover:bg-purple-700 transition-transform duration-300 hover:scale-105"
+              >
+                {cta.primaryButton}
+              </Button>
+            </Link>
+            <Link href="/propose">
+              <Button
+                variant="outline"
+                size="lg"
+                className="border-gray-600 text-white hover:bg-gray-800 transition-transform duration-300 hover:scale-105"
+              >
+                {cta.secondaryButton}
+              </Button>
+            </Link>
+          </div>
         </div>
       </div>
     </section>

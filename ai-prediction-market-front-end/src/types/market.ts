@@ -34,6 +34,7 @@ export interface MarketMetadata {
 
 export interface UserPosition {
   marketAddress: string;
+  marketName: string;
   yesBalance: number;
   noBalance: number;
   lpBalance: number;
