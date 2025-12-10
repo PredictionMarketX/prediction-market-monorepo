@@ -87,7 +87,7 @@ BACKEND_PRIVATE_KEY=your_base58_private_key
 X402_PAYMENT_ADDRESS=your_payment_address
 X402_FACILITATOR_URL=https://x402.org/facilitator
 
-# CORS
+# CORS (comma-separated for multiple origins)
 CORS_ORIGIN=http://localhost:3000
 
 # Database (PostgreSQL/Neon)
@@ -105,8 +105,12 @@ RATE_LIMIT_PROPOSE_PER_MIN=5
 RATE_LIMIT_PROPOSE_PER_HOUR=20
 RATE_LIMIT_PROPOSE_PER_DAY=50
 
-# Internal Auth
-INTERNAL_JWT_SECRET=your_jwt_secret
+# Internal Auth (REQUIRED - minimum 32 characters)
+INTERNAL_JWT_SECRET=your_secure_random_string_at_least_32_chars
+
+# Admin Addresses (comma-separated Solana wallet addresses)
+ADMIN_ADDRESSES=wallet1,wallet2
+SUPER_ADMIN_ADDRESSES=super_admin_wallet
 ```
 
 #### Workers (.env)
@@ -349,7 +353,9 @@ railway variables set CORS_ORIGIN="https://your-frontend.vercel.app"
 railway variables set RABBITMQ_URL="amqps://user:pass@host/vhost"
 railway variables set OPENAI_API_KEY="sk-your-key"
 railway variables set OPENAI_MODEL="gpt-4o-mini"
-railway variables set INTERNAL_JWT_SECRET="your_jwt_secret"
+railway variables set INTERNAL_JWT_SECRET="your_secure_random_string_at_least_32_chars"
+railway variables set ADMIN_ADDRESSES="wallet1,wallet2"
+railway variables set SUPER_ADMIN_ADDRESSES="super_admin_wallet"
 
 # Deploy
 railway up
@@ -368,11 +374,13 @@ railway up
 | `BACKEND_PRIVATE_KEY` | Yes | Base58 string | Backend wallet private key |
 | `X402_PAYMENT_ADDRESS` | Yes | Solana address | Payment receiving address |
 | `X402_FACILITATOR_URL` | Yes | `https://x402.org/facilitator` | X402 facilitator URL |
-| `CORS_ORIGIN` | Yes | `https://your-app.com` | Frontend URL for CORS |
+| `CORS_ORIGIN` | Yes | `https://your-app.com` | Frontend URL for CORS (comma-separated for multiple) |
 | `RABBITMQ_URL` | Yes | `amqps://...` | CloudAMQP connection URL |
 | `OPENAI_API_KEY` | Yes | `sk-...` | OpenAI API key |
 | `OPENAI_MODEL` | No | `gpt-4o-mini` | OpenAI model (default: gpt-4o-mini) |
-| `INTERNAL_JWT_SECRET` | Yes | Random string | JWT secret for internal auth |
+| `INTERNAL_JWT_SECRET` | Yes | 32+ char string | JWT secret for worker auth (min 32 chars) |
+| `ADMIN_ADDRESSES` | No | Solana addresses | Comma-separated admin wallet addresses |
+| `SUPER_ADMIN_ADDRESSES` | No | Solana addresses | Comma-separated super admin wallet addresses |
 
 #### Step 4: Deploy Worker Services
 

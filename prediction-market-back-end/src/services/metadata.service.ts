@@ -1,9 +1,16 @@
+/**
+ * Metadata Service
+ *
+ * Manages market metadata using the ai_markets table.
+ * This service is used for manual market creation from the frontend.
+ * AI-generated markets also use ai_markets but go through the worker pipeline.
+ */
+
 import { getDb, isDatabaseConfigured } from '../db/client.js';
 import { NotFoundError, BadRequestError } from '../utils/errors.js';
+import { config } from '../config/index.js';
 
 // Supported chain IDs
-// Format: {chain}-{network}
-// Examples: solana-devnet, solana-mainnet, ethereum-mainnet, cardano-mainnet
 export type ChainId =
   | 'solana-devnet'
   | 'solana-mainnet'
@@ -11,9 +18,7 @@ export type ChainId =
   | 'ethereum-sepolia'
   | 'base-mainnet'
   | 'base-sepolia'
-  | 'cardano-mainnet'
-  | 'cardano-testnet'
-  | string; // Allow custom chain IDs
+  | string; // Allow custom chain IDs for future expansion
 
 export interface MarketMetadata {
   id: string;
@@ -28,7 +33,7 @@ export interface MarketMetadata {
 }
 
 export interface CreateMetadataParams {
-  chainId?: ChainId; // Defaults to 'solana-devnet'
+  chainId?: ChainId;
   name: string;
   symbol: string;
   description?: string;
@@ -36,24 +41,85 @@ export interface CreateMetadataParams {
   resolutionSource?: string;
 }
 
+// Database row type
+interface AiMarketRow {
+  id: string;
+  chain_id: string;
+  market_address?: string | null;
+  name: string;
+  description?: string | null;
+  category?: string | null;
+  resolution?: { sources?: string[] } | null;
+  created_at: Date;
+}
+
 export class MetadataService {
+  /**
+   * Create metadata entry in ai_markets for manual market creation
+   */
   async create(params: CreateMetadataParams): Promise<MarketMetadata> {
     if (!isDatabaseConfigured()) {
       throw new BadRequestError('Database not configured');
     }
 
     const sql = getDb();
-    const chainId = params.chainId || 'solana-devnet';
 
-    const [row] = await sql`
-      INSERT INTO market_metadata (chain_id, name, symbol, description, category, resolution_source)
-      VALUES (${chainId}, ${params.name}, ${params.symbol}, ${params.description || null}, ${params.category || null}, ${params.resolutionSource || null})
-      RETURNING id, chain_id, name, symbol, description, category, resolution_source, created_at
+    // Use centralized config for defaults
+    const chainId = params.chainId || config.defaults.chainId;
+    const { validCategories, category: defaultCategory } = config.defaults;
+    const category = (params.category && validCategories.includes(params.category as typeof validCategories[number]))
+      ? params.category
+      : defaultCategory;
+
+    const description = params.description || '';
+    const resolutionJson = JSON.stringify({
+      expiry: null,
+      sources: params.resolutionSource ? [params.resolutionSource] : [],
+      must_meet_all: [],
+    });
+
+    const result = await sql<AiMarketRow[]>`
+      INSERT INTO ai_markets (
+        chain_id,
+        title,
+        description,
+        category,
+        ai_version,
+        confidence_score,
+        resolution,
+        status,
+        created_by
+      )
+      VALUES (
+        ${chainId},
+        ${params.name},
+        ${description},
+        ${category},
+        'manual',
+        ${1.0},
+        ${resolutionJson}::jsonb,
+        'pending_publish',
+        'manual'
+      )
+      RETURNING id, chain_id, title as name, description, category, resolution, created_at
     `;
+    const row = result[0];
 
-    return this.mapRow(row);
+    return {
+      id: row.id,
+      chainId: row.chain_id,
+      name: row.name,
+      symbol: params.symbol, // Symbol not stored in ai_markets, return input
+      description: row.description || undefined,
+      category: row.category || undefined,
+      resolutionSource: row.resolution?.sources?.[0] || undefined,
+      createdAt: row.created_at,
+    };
   }
 
+  /**
+   * Get metadata by ID
+   */
   async getById(id: string): Promise<MarketMetadata> {
     if (!isDatabaseConfigured()) {
       throw new BadRequestError('Database not configured');
@@ -61,9 +127,9 @@ export class MetadataService {
 
     const sql = getDb();
 
-    const [row] = await sql`
-      SELECT id, chain_id, market_address, name, symbol, description, category, resolution_source, created_at
-      FROM market_metadata
+    const [row] = await sql<AiMarketRow[]>`
+      SELECT id, chain_id, market_address, title as name, description, category, resolution, created_at
+      FROM ai_markets
       WHERE id = ${id}
     `;
 
@@ -74,6 +140,9 @@ export class MetadataService {
     return this.mapRow(row);
   }
 
+  /**
+   * Get metadata by market address
+   */
   async getByMarketAddress(marketAddress: string): Promise<MarketMetadata | null> {
     if (!isDatabaseConfigured()) {
       return null;
@@ -81,9 +150,9 @@ export class MetadataService {
 
     const sql = getDb();
 
-    const [row] = await sql`
-      SELECT id, chain_id, market_address, name, symbol, description, category, resolution_source, created_at
-      FROM market_metadata
+    const [row] = await sql<AiMarketRow[]>`
+      SELECT id, chain_id, market_address, title as name, description, category, resolution, created_at
+      FROM ai_markets
       WHERE market_address = ${marketAddress}
     `;
 
@@ -94,6 +163,9 @@ export class MetadataService {
     return this.mapRow(row);
   }
 
+  /**
+   * Link metadata to market address after on-chain creation
+   */
   async linkToMarket(metadataId: string, marketAddress: string): Promise<MarketMetadata> {
     if (!isDatabaseConfigured()) {
       throw new BadRequestError('Database not configured');
@@ -101,11 +173,14 @@ export class MetadataService {
 
     const sql = getDb();
 
-    const [row] = await sql`
-      UPDATE market_metadata
-      SET market_address = ${marketAddress}
+    const [row] = await sql<AiMarketRow[]>`
+      UPDATE ai_markets
+      SET
+        market_address = ${marketAddress},
+        status = 'active',
+        published_at = NOW()
       WHERE id = ${metadataId}
-      RETURNING id, chain_id, market_address, name, symbol, description, category, resolution_source, created_at
+      RETURNING id, chain_id, market_address, title as name, description, category, resolution, created_at
     `;
 
     if (!row) {
@@ -115,16 +190,16 @@ export class MetadataService {
     return this.mapRow(row);
   }
 
-  private mapRow(row: any): MarketMetadata {
+  private mapRow(row: AiMarketRow): MarketMetadata {
     return {
       id: row.id,
       chainId: row.chain_id,
       marketAddress: row.market_address || undefined,
       name: row.name,
-      symbol: row.symbol,
+      symbol: '', // Not stored in ai_markets
       description: row.description || undefined,
       category: row.category || undefined,
-      resolutionSource: row.resolution_source || undefined,
+      resolutionSource: row.resolution?.sources?.[0] || undefined,
       createdAt: row.created_at,
     };
   }

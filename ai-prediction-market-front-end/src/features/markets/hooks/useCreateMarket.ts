@@ -4,14 +4,9 @@ import { marketKeys, CreateMarketFormValues } from '../types';
 import { createMarketDirect, createMarketViaBackend, linkMetadataToMarket } from '../api';
 import { useBlockchain } from '@/lib/blockchain';
 import { apiClient } from '@/lib/api/client';
-import { solanaConfig } from '@/lib/blockchain/solana/config';
+import { env } from '@/config/env';
 import type { CreateMarketParams } from '@/types';
 
-// Get current chain ID based on blockchain config
-function getCurrentChainId(): string {
-  // For now, we're using Solana - format: solana-{network}
-  return `solana-${solanaConfig.network}`;
-}
 
 interface CreateMarketOptions {
   useX402?: boolean;
@@ -83,12 +78,10 @@ interface MetadataResult {
 }
 
 async function generateMetadata(values: CreateMarketFormValues): Promise<MetadataResult> {
-  const chainId = getCurrentChainId();
-
   try {
     // Try to store metadata in backend database
     const response = await apiClient.createMetadata({
-      chainId,
+      chainId: env.chainId,
       name: values.question,
       symbol: values.yesSymbol,
       description: values.description,
@@ -105,7 +98,7 @@ async function generateMetadata(values: CreateMarketFormValues): Promise<Metadat
 
   // Fallback: use data URI (no external storage needed, no ID to link)
   const metadata = {
-    chainId,
+    chainId: env.chainId,
     name: values.question,
     symbol: values.yesSymbol,
     description: values.description || '',
