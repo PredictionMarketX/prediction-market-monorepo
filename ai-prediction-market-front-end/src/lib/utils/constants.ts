@@ -20,8 +20,9 @@ export const MIN_INITIAL_PROBABILITY = 20; // 20%
 export const MAX_INITIAL_PROBABILITY = 80; // 80%
 
 // Pagination
-export const DEFAULT_PAGE_SIZE = 10;
+export const DEFAULT_PAGE_SIZE = 9;
 export const MAX_PAGE_SIZE = 100;
+export const CLIENT_FILTER_FETCH_LIMIT = 100; // Fetch limit for client-side filtering
 
 // Timeouts
 export const TRANSACTION_TIMEOUT = 60000; // 60 seconds

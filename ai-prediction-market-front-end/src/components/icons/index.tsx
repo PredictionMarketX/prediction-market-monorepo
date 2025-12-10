@@ -1,5 +1,21 @@
 import { SVGProps } from 'react';
-import { TrendingUp, Users, Zap, BrainCircuit, Droplets, ShieldCheck } from 'lucide-react';
+import {
+  TrendingUp,
+  Users,
+  Zap,
+  BrainCircuit,
+  Droplets,
+  ShieldCheck,
+  Bitcoin,
+  Vote,
+  Trophy,
+  Tv,
+  Microscope,
+  PiggyBank,
+  Globe,
+  MoreHorizontal,
+  LayoutGrid,
+} from 'lucide-react';
 
 type IconProps = SVGProps<SVGSVGElement>;
 
@@ -67,3 +83,18 @@ export const featureIcons = {
 };
 
 export type FeatureIconType = keyof typeof featureIcons;
+
+// Category icons for market filtering
+export const categoryIcons = {
+  all: LayoutGrid,
+  crypto: Bitcoin,
+  politics: Vote,
+  sports: Trophy,
+  entertainment: Tv,
+  science: Microscope,
+  finance: PiggyBank,
+  world: Globe,
+  other: MoreHorizontal,
+};
+
+export type CategoryIconType = keyof typeof categoryIcons;

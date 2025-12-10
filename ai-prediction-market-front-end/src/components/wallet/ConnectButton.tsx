@@ -20,8 +20,8 @@ export function ConnectButton() {
         onMouseLeave={() => setShowDisconnect(false)}
       >
         <Button variant="outline" className="border-purple-600 bg-purple-900/30 text-white hover:bg-purple-900/50">
-          <Wallet className="mr-2 h-4 w-4" />
-          {formatAddress(publicKey.toBase58(), 4)}
+          <Wallet className="h-4 w-4 sm:mr-2" />
+          <span className="hidden sm:inline">{formatAddress(publicKey.toBase58(), 4)}</span>
         </Button>
         {showDisconnect && (
           <Button
@@ -40,8 +40,8 @@ export function ConnectButton() {
 
   return (
     <Button onClick={() => setVisible(true)} className="bg-purple-600 hover:bg-purple-700">
-      <Wallet className="mr-2 h-4 w-4" />
-      Connect Wallet
+      <Wallet className="h-4 w-4 sm:mr-2" />
+      <span className="hidden sm:inline">Connect Wallet</span>
     </Button>
   );
 }
