@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useWallet } from '@solana/wallet-adapter-react';
 import {
   listAdminProposals,
   reviewProposal,
@@ -157,6 +158,9 @@ function ProposalCard({
 
 export default function AdminProposalsPage() {
   const router = useRouter();
+  const { publicKey, connected } = useWallet();
+  const walletAddress = publicKey?.toBase58();
+
   const [proposals, setProposals] = useState<AdminProposal[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -164,11 +168,15 @@ export default function AdminProposalsPage() {
 
   useEffect(() => {
     async function load() {
+      if (!walletAddress) {
+        setIsLoading(false);
+        return;
+      }
       setIsLoading(true);
       setError(null);
       try {
         const status = statusFilter === 'all' ? undefined : statusFilter;
-        const result = await listAdminProposals({ status, limit: 50 });
+        const result = await listAdminProposals({ status, limit: 50, walletAddress });
         setProposals(result.data);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load proposals');
@@ -177,14 +185,15 @@ export default function AdminProposalsPage() {
       }
     }
     load();
-  }, [statusFilter]);
+  }, [statusFilter, walletAddress]);
 
   const handleReview = async (id: string, decision: 'approve' | 'reject') => {
+    if (!walletAddress) return;
     try {
-      await reviewProposal(id, { decision, reason: 'Approved by admin' });
+      await reviewProposal(id, { decision, reason: 'Approved by admin' }, walletAddress);
       // Refresh list
       const status = statusFilter === 'all' ? undefined : statusFilter;
-      const result = await listAdminProposals({ status, limit: 50 });
+      const result = await listAdminProposals({ status, limit: 50, walletAddress });
       setProposals(result.data);
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to review proposal');
@@ -192,6 +201,14 @@ export default function AdminProposalsPage() {
   };
 
   const pendingCount = proposals.filter((p) => p.status === 'needs_human').length;
+
+  if (!connected) {
+    return (
+      <div className="max-w-4xl mx-auto text-center py-12">
+        <p className="text-gray-400">Please connect your wallet to access proposal review.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto">

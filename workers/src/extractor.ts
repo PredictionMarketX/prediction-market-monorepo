@@ -27,6 +27,9 @@ import {
   recordSuccess,
   recordFailure,
   setIdle,
+  applyProcessingDelay,
+  isWorkerEnabled,
+  waitUntilEnabled,
 } from './shared/index.js';
 import type { MarketCategory } from '@x402/shared-types';
 
@@ -303,10 +306,20 @@ async function main(): Promise<void> {
   await consumeQueue<NewsRawMessage>(
     QUEUE_NAMES.NEWS_RAW,
     async (message, ack, nack) => {
+      // Check if worker is enabled before processing
+      if (!isWorkerEnabled()) {
+        logger.info({ newsId: message.news_id }, 'Worker disabled, requeueing message');
+        nack(); // Put message back in queue
+        await waitUntilEnabled(); // Wait until re-enabled
+        return;
+      }
+
       try {
         await processNewsItem(message);
         recordSuccess();
         ack();
+        // Apply delay after successful processing to prevent AI burst usage
+        await applyProcessingDelay();
       } catch (error) {
         const err = error as Error;
         logger.error({ error: { message: err.message, stack: err.stack, name: err.name }, newsId: message.news_id }, 'Failed to process news item');

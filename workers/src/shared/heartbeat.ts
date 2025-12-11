@@ -177,6 +177,19 @@ export function isWorkerEnabled(): boolean {
 }
 
 /**
+ * Wait until worker is enabled (checks every 10 seconds)
+ * Returns immediately if already enabled
+ */
+export async function waitUntilEnabled(): Promise<void> {
+  while (!isEnabled) {
+    logger.info({ workerType }, 'Worker is disabled, waiting...');
+    await new Promise(resolve => setTimeout(resolve, 10000)); // Check every 10 seconds
+    // Trigger a heartbeat to refresh enabled status
+    await sendHeartbeat();
+  }
+}
+
+/**
  * Get the unique instance ID for this worker process
  */
 export function getInstanceId(): string {

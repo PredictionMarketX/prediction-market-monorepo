@@ -18,9 +18,11 @@ interface UpdateConfigBody {
     propose_per_day?: number;
     dispute_per_hour?: number;
     dispute_per_day?: number;
+    auto_publish_per_hour?: number;
   };
   dispute_window_hours?: number;
   max_retries?: number;
+  processing_delay_ms?: number;
 }
 
 export async function adminAiConfigRoutes(app: FastifyInstance) {
@@ -134,6 +136,18 @@ export async function adminAiConfigRoutes(app: FastifyInstance) {
                 error: {
                   code: 'invalid_value',
                   message: `llm_model must be one of: ${validModels.join(', ')}`,
+                },
+              });
+            }
+          }
+
+          if (key === 'processing_delay_ms') {
+            if (typeof value !== 'number' || value < 0 || value > 600000) {
+              return reply.status(400).send({
+                success: false,
+                error: {
+                  code: 'invalid_value',
+                  message: 'processing_delay_ms must be between 0 and 600000 (10 minutes)',
                 },
               });
             }

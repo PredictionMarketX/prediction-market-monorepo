@@ -26,6 +26,9 @@ import {
   recordSuccess,
   recordFailure,
   setIdle,
+  applyProcessingDelay,
+  isWorkerEnabled,
+  waitUntilEnabled,
 } from './shared/index.js';
 import {
   MARKET_GENERATION_SYSTEM_PROMPT,
@@ -205,10 +208,20 @@ async function main(): Promise<void> {
   await consumeQueue<CandidateMessage>(
     QUEUE_NAMES.CANDIDATES,
     async (message, ack, nack) => {
+      // Check if worker is enabled before processing
+      if (!isWorkerEnabled()) {
+        logger.info({ candidateId: message.candidate_id }, 'Worker disabled, requeueing message');
+        nack(); // Put message back in queue
+        await waitUntilEnabled(); // Wait until re-enabled
+        return;
+      }
+
       try {
         await processCandidate(message);
         recordSuccess();
         ack();
+        // Apply delay after successful processing to prevent AI burst usage
+        await applyProcessingDelay();
       } catch (error) {
         const err = error as Error;
         logger.error({

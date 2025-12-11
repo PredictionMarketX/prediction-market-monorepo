@@ -26,6 +26,9 @@ import {
   recordSuccess,
   recordFailure,
   setIdle,
+  applyProcessingDelay,
+  isWorkerEnabled,
+  waitUntilEnabled,
 } from './shared/index.js';
 import {
   VALIDATION_SYSTEM_PROMPT,
@@ -256,10 +259,20 @@ async function main(): Promise<void> {
   await consumeQueue<DraftValidateMessage>(
     QUEUE_NAMES.DRAFTS_VALIDATE,
     async (message, ack, nack) => {
+      // Check if worker is enabled before processing
+      if (!isWorkerEnabled()) {
+        logger.info({ draftMarketId: message.draft_market_id }, 'Worker disabled, requeueing message');
+        nack(); // Put message back in queue
+        await waitUntilEnabled(); // Wait until re-enabled
+        return;
+      }
+
       try {
         await processValidation(message);
         recordSuccess();
         ack();
+        // Apply delay after successful processing to prevent AI burst usage
+        await applyProcessingDelay();
       } catch (error) {
         const err = error as Error;
         logger.error({ error: { message: err.message, stack: err.stack, name: err.name }, draftMarketId: message.draft_market_id }, 'Failed to validate draft');

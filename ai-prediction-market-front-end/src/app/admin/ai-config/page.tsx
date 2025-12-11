@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useWallet } from '@solana/wallet-adapter-react';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -20,6 +21,16 @@ interface AIConfig {
   };
   dispute_window_hours: number;
   max_retries: number;
+  processing_delay_ms: number;
+}
+
+// Helper to format milliseconds as human-readable
+function formatDelay(ms: number): string {
+  if (ms >= 60000) {
+    const minutes = ms / 60000;
+    return `${minutes} minute${minutes !== 1 ? 's' : ''}`;
+  }
+  return `${ms / 1000} second${ms !== 1000 ? 's' : ''}`;
 }
 
 interface ConfigMetadata {
@@ -47,8 +58,12 @@ const ALL_CATEGORIES = [
   'misc',
 ];
 
-async function getAIConfig(): Promise<{ config: AIConfig; metadata: ConfigMetadata }> {
-  const response = await fetch(`${API_BASE}/api/v1/admin/ai-config`);
+async function getAIConfig(walletAddress?: string): Promise<{ config: AIConfig; metadata: ConfigMetadata }> {
+  const headers: Record<string, string> = {};
+  if (walletAddress) {
+    headers['x-user-address'] = walletAddress;
+  }
+  const response = await fetch(`${API_BASE}/api/v1/admin/ai-config`, { headers });
   if (!response.ok) {
     const error = await response.json();
     throw new Error(error.error?.message || 'Failed to fetch config');
@@ -57,10 +72,14 @@ async function getAIConfig(): Promise<{ config: AIConfig; metadata: ConfigMetada
   return result.data;
 }
 
-async function updateAIConfig(updates: Partial<AIConfig>): Promise<void> {
+async function updateAIConfig(updates: Partial<AIConfig>, walletAddress?: string): Promise<void> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (walletAddress) {
+    headers['x-user-address'] = walletAddress;
+  }
   const response = await fetch(`${API_BASE}/api/v1/admin/ai-config`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(updates),
   });
   if (!response.ok) {
@@ -70,6 +89,9 @@ async function updateAIConfig(updates: Partial<AIConfig>): Promise<void> {
 }
 
 export default function AdminAIConfigPage() {
+  const { publicKey, connected } = useWallet();
+  const walletAddress = publicKey?.toBase58();
+
   const [config, setConfig] = useState<AIConfig | null>(null);
   const [metadata, setMetadata] = useState<ConfigMetadata | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -82,8 +104,12 @@ export default function AdminAIConfigPage() {
 
   useEffect(() => {
     async function load() {
+      if (!walletAddress) {
+        setIsLoading(false);
+        return;
+      }
       try {
-        const { config, metadata } = await getAIConfig();
+        const { config, metadata } = await getAIConfig(walletAddress);
         setConfig(config);
         setMetadata(metadata);
         setFormData({
@@ -92,6 +118,7 @@ export default function AdminAIConfigPage() {
           dispute_window_hours: config.dispute_window_hours,
           rate_limits: config.rate_limits,
           categories: config.categories,
+          processing_delay_ms: config.processing_delay_ms,
         });
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load config');
@@ -100,17 +127,18 @@ export default function AdminAIConfigPage() {
       }
     }
     load();
-  }, []);
+  }, [walletAddress]);
 
   const handleSave = async () => {
+    if (!walletAddress) return;
     setIsSaving(true);
     setError(null);
     setSuccess(null);
     try {
-      await updateAIConfig(formData);
+      await updateAIConfig(formData, walletAddress);
       setSuccess('Configuration updated successfully');
       // Reload config
-      const { config, metadata } = await getAIConfig();
+      const { config, metadata } = await getAIConfig(walletAddress);
       setConfig(config);
       setMetadata(metadata);
     } catch (err) {
@@ -137,6 +165,14 @@ export default function AdminAIConfigPage() {
       } as AIConfig['rate_limits'],
     });
   };
+
+  if (!connected) {
+    return (
+      <div className="max-w-4xl mx-auto text-center py-12">
+        <p className="text-gray-400">Please connect your wallet to access AI configuration.</p>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -251,6 +287,34 @@ export default function AdminAIConfigPage() {
           </div>
           <p className="text-xs text-gray-400 mt-2">
             Time window after resolution during which disputes can be submitted
+          </p>
+        </section>
+
+        {/* Processing Delay */}
+        <section className="p-6 bg-gray-800/50 border border-gray-700 rounded-lg">
+          <h2 className="text-lg font-semibold text-white mb-4">Processing Delay</h2>
+          <div className="flex items-center gap-4">
+            <select
+              value={formData.processing_delay_ms ?? config.processing_delay_ms ?? 60000}
+              onChange={(e) =>
+                setFormData({ ...formData, processing_delay_ms: parseInt(e.target.value) })
+              }
+              className="w-48 px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white"
+            >
+              <option value={0}>No delay</option>
+              <option value={10000}>10 seconds</option>
+              <option value={30000}>30 seconds</option>
+              <option value={60000}>1 minute</option>
+              <option value={120000}>2 minutes</option>
+              <option value={300000}>5 minutes</option>
+            </select>
+            <span className="text-gray-400">
+              Current: {formatDelay(formData.processing_delay_ms ?? config.processing_delay_ms ?? 60000)}
+            </span>
+          </div>
+          <p className="text-xs text-gray-400 mt-2">
+            Delay between processing each news item. Prevents burst AI API usage.
+            Higher values reduce cost but slow down market generation.
           </p>
         </section>
 

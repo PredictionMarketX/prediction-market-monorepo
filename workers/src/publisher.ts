@@ -28,6 +28,8 @@ import {
   isValidPrivateKey,
   getSolanaClient,
   canAutoPublish,
+  isWorkerEnabled,
+  waitUntilEnabled,
 } from './shared/index.js';
 
 // Override worker type
@@ -343,6 +345,14 @@ async function main(): Promise<void> {
   await consumeQueue<MarketPublishMessage>(
     QUEUE_NAMES.MARKETS_PUBLISH,
     async (message, ack, nack) => {
+      // Check if worker is enabled before processing
+      if (!isWorkerEnabled()) {
+        logger.info({ draftMarketId: message.draft_market_id }, 'Worker disabled, requeueing message');
+        nack(); // Put message back in queue
+        await waitUntilEnabled(); // Wait until re-enabled
+        return;
+      }
+
       try {
         await processPublish(message);
         recordSuccess();

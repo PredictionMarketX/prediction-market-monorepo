@@ -24,6 +24,7 @@ import {
   recordFailure,
   setIdle,
   canAutoPublish,
+  isWorkerEnabled,
 } from './shared/index.js';
 
 // Override worker type
@@ -223,6 +224,12 @@ async function processFeed(feed: RssFeed): Promise<number> {
  */
 async function pollAllFeeds(): Promise<void> {
   logger.info('Starting RSS polling cycle');
+
+  // Check if worker is enabled
+  if (!isWorkerEnabled()) {
+    logger.info('Worker is disabled, skipping RSS polling cycle');
+    return;
+  }
 
   // Check if auto-publish rate limit is already hit
   // If so, skip crawling to save resources (no point crawling if we can't publish)

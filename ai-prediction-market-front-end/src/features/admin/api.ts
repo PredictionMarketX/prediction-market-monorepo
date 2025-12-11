@@ -2,6 +2,30 @@ import { config } from '@/config';
 
 const API_BASE = config.api.baseUrl;
 
+// Helper to get wallet address from localStorage (set by wallet adapter)
+function getStoredWalletAddress(): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    // Try to get from localStorage where wallet adapter might store it
+    const walletState = localStorage.getItem('walletName');
+    // This is a fallback - the actual address should be passed from components
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+// Create headers with optional wallet address
+function createHeaders(walletAddress?: string): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (walletAddress) {
+    headers['x-user-address'] = walletAddress;
+  }
+  return headers;
+}
+
 interface ApiResponse<T> {
   success: boolean;
   data?: T;
@@ -75,6 +99,7 @@ export interface ReviewDecision {
 export async function listAdminProposals(options: {
   status?: string;
   limit?: number;
+  walletAddress?: string;
 } = {}): Promise<{ data: AdminProposal[]; hasMore: boolean }> {
   const params = new URLSearchParams();
   if (options.status) params.set('status', options.status);
@@ -82,9 +107,7 @@ export async function listAdminProposals(options: {
 
   const response = await fetch(`${API_BASE}/api/v1/admin/proposals?${params}`, {
     method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: createHeaders(options.walletAddress),
   });
 
   const result: ApiResponse<AdminProposal[]> = await response.json();
@@ -100,12 +123,10 @@ export async function listAdminProposals(options: {
 }
 
 // Get proposal details
-export async function getAdminProposal(id: string): Promise<AdminProposalDetail> {
+export async function getAdminProposal(id: string, walletAddress?: string): Promise<AdminProposalDetail> {
   const response = await fetch(`${API_BASE}/api/v1/admin/proposals/${id}`, {
     method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: createHeaders(walletAddress),
   });
 
   const result: ApiResponse<AdminProposalDetail> = await response.json();
@@ -120,13 +141,12 @@ export async function getAdminProposal(id: string): Promise<AdminProposalDetail>
 // Review a proposal
 export async function reviewProposal(
   id: string,
-  decision: ReviewDecision
+  decision: ReviewDecision,
+  walletAddress?: string
 ): Promise<{ status: string; decision: string }> {
   const response = await fetch(`${API_BASE}/api/v1/admin/proposals/${id}/review`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: createHeaders(walletAddress),
     body: JSON.stringify(decision),
   });
 

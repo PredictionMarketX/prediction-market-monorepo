@@ -22,6 +22,7 @@ export interface AIConfig {
   };
   dispute_window_hours: number;
   max_retries: number;
+  processing_delay_ms: number; // Delay between processing items (to prevent AI burst usage)
 }
 
 // Default configuration
@@ -40,6 +41,7 @@ const DEFAULT_CONFIG: AIConfig = {
   },
   dispute_window_hours: 24,
   max_retries: 3,
+  processing_delay_ms: 60000, // 1 minute delay between processing items (to prevent AI burst usage)
 };
 
 // Cache
@@ -204,4 +206,30 @@ export async function canAutoPublish(): Promise<{
     currentCount,
     limit,
   };
+}
+
+/**
+ * Get processing delay between items (in milliseconds)
+ */
+export async function getProcessingDelayMs(): Promise<number> {
+  return getConfigValue('processing_delay_ms');
+}
+
+/**
+ * Sleep utility for applying processing delay
+ */
+export function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Apply processing delay (call after processing each item)
+ * Logs the delay being applied
+ */
+export async function applyProcessingDelay(): Promise<void> {
+  const delayMs = await getProcessingDelayMs();
+  if (delayMs > 0) {
+    logger.debug({ delayMs }, 'Applying processing delay before next item');
+    await sleep(delayMs);
+  }
 }
