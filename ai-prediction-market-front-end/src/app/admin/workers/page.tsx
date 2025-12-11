@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { useWallet } from '@solana/wallet-adapter-react';
 import { config } from '@/config';
 
 interface WorkerHeartbeat {
@@ -45,8 +46,12 @@ interface WorkersSummary {
   unhealthy: number;
 }
 
-async function getWorkers(): Promise<{ workers: WorkerStatus[]; summary: WorkersSummary }> {
-  const response = await fetch(`${config.api.baseUrl}/api/v1/admin/workers`);
+async function getWorkers(walletAddress?: string): Promise<{ workers: WorkerStatus[]; summary: WorkersSummary }> {
+  const headers: Record<string, string> = {};
+  if (walletAddress) {
+    headers['x-user-address'] = walletAddress;
+  }
+  const response = await fetch(`${config.api.baseUrl}/api/v1/admin/workers`, { headers });
   if (!response.ok) {
     const error = await response.json();
     throw new Error(error.error?.message || 'Failed to fetch workers');
@@ -55,10 +60,14 @@ async function getWorkers(): Promise<{ workers: WorkerStatus[]; summary: Workers
   return result.data;
 }
 
-async function updateWorker(workerType: string, enabled: boolean): Promise<void> {
+async function updateWorker(workerType: string, enabled: boolean, walletAddress?: string): Promise<void> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (walletAddress) {
+    headers['x-user-address'] = walletAddress;
+  }
   const response = await fetch(`${config.api.baseUrl}/api/v1/admin/workers/${workerType}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({ enabled }),
   });
   if (!response.ok) {
@@ -250,6 +259,9 @@ function WorkerCard({
 }
 
 export default function WorkersPage() {
+  const { publicKey, connected } = useWallet();
+  const walletAddress = publicKey?.toBase58();
+
   const [workers, setWorkers] = useState<WorkerStatus[]>([]);
   const [summary, setSummary] = useState<WorkersSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -259,8 +271,12 @@ export default function WorkersPage() {
   const [autoRefresh, setAutoRefresh] = useState(true);
 
   const loadWorkers = useCallback(async () => {
+    if (!walletAddress) {
+      setIsLoading(false);
+      return;
+    }
     try {
-      const { workers, summary } = await getWorkers();
+      const { workers, summary } = await getWorkers(walletAddress);
       setWorkers(workers);
       setSummary(summary);
       setError(null);
@@ -269,12 +285,13 @@ export default function WorkersPage() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [walletAddress]);
 
   const handleRefresh = useCallback(async () => {
+    if (!walletAddress) return;
     setIsRefreshing(true);
     try {
-      const { workers, summary } = await getWorkers();
+      const { workers, summary } = await getWorkers(walletAddress);
       setWorkers(workers);
       setSummary(summary);
       setError(null);
@@ -283,7 +300,7 @@ export default function WorkersPage() {
     } finally {
       setIsRefreshing(false);
     }
-  }, []);
+  }, [walletAddress]);
 
   useEffect(() => {
     loadWorkers();
@@ -300,9 +317,10 @@ export default function WorkersPage() {
   }, [autoRefresh, loadWorkers]);
 
   const handleToggle = async (workerType: string, enabled: boolean) => {
+    if (!walletAddress) return;
     setUpdatingWorker(workerType);
     try {
-      await updateWorker(workerType, enabled);
+      await updateWorker(workerType, enabled, walletAddress);
       await loadWorkers();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update worker');
@@ -310,6 +328,14 @@ export default function WorkersPage() {
       setUpdatingWorker(null);
     }
   };
+
+  if (!connected) {
+    return (
+      <div className="max-w-4xl mx-auto text-center py-12">
+        <p className="text-gray-400">Please connect your wallet to access the worker monitor.</p>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (

@@ -19,7 +19,7 @@ export async function registerCors(app: FastifyInstance) {
   await app.register(cors, {
     origin,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Payment', 'X-Payment-Response', 'X-Request-Id'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Payment', 'X-Payment-Response', 'X-Request-Id', 'X-User-Address'],
     exposedHeaders: ['X-Payment-Response', 'Retry-After', 'X-RateLimit-Limit', 'X-RateLimit-Remaining'],
     credentials: true,
   });
